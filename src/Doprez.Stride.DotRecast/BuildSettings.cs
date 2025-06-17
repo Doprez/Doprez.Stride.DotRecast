@@ -1,4 +1,5 @@
 ﻿using DotRecast.Recast;
+using DotRecast.Recast.Toolset;
 using Stride.Core;
 
 namespace Doprez.Stride.DotRecast;
@@ -57,8 +58,33 @@ public class BuildSettings
 
     public float DetailSampleMaxError = 1f;
 
-    public bool Tiled = true;
-
     public int TileSize = 32;
+
+    public RcNavMeshBuildSettings ToRcNavMeshBuildSettings()
+    {
+        return new RcNavMeshBuildSettings
+        {
+            cellSize = CellSize,
+            cellHeight = CellHeight,
+            agentHeight = AgentHeight,
+            agentRadius = AgentRadius,
+            agentMaxClimb = AgentMaxClimb,
+            agentMaxSlope = AgentMaxSlope,
+            agentMaxAcceleration = AgentMaxAcceleration,
+            minRegionSize = MinRegionSize,
+            mergedRegionSize = MergedRegionSize,
+            partitioning = Partitioning,
+            filterLowHangingObstacles = FilterLowHangingObstacles,
+            filterLedgeSpans = FilterLedgeSpans,
+            filterWalkableLowHeightSpans = FilterWalkableLowHeightSpans,
+            edgeMaxLen = EdgeMaxLen,
+            edgeMaxError = EdgeMaxError,
+            vertsPerPoly = VertsPerPoly,
+            detailSampleDist = DetailSampleDist,
+            detailSampleMaxError = DetailSampleMaxError,
+            tiled = true,
+            tileSize = TileSize
+        };
+    }
 }
 

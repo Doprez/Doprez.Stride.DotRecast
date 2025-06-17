@@ -23,7 +23,7 @@ public sealed class NavigationMeshComponent : StartupScript
 
     public NavMeshLayer NavMeshLayer;
 
-    public RcNavMeshBuildSettings NavMeshBuildSettings = new();
+    public BuildSettings NavMeshBuildSettings = new();
 
     [DataMemberIgnore]
     public Dictionary<Entity, GeometryData> ShapeData = [];
