@@ -35,6 +35,8 @@ public class NavigationAgentProcessor : EntityProcessor<NavigationAgentComponent
     {
         var deltaTime = (float)time.Elapsed.TotalSeconds;
 
+        // Process 10 agents at a time to avoid blocking the main thread for too long.
+        // TODO: make this configurable or/and resolve multithreading issues with the pathfinding.
         for (var i = 0; i < 10; i++)
         {
             if (_tryGetPathQueue.IsEmpty) break;

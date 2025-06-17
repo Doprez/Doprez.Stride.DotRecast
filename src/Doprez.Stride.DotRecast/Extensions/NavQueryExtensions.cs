@@ -23,7 +23,6 @@ public static class NavQueryExtensions
     /// <returns></returns>
     public static DtStatus FindFollowPath(this DtNavMeshQuery navQuery, long startPolyRef, long endPolyRef, RcVec3f start, RcVec3f end, IDtQueryFilter filter, bool enableRaycast, Span<long> path, ref List<Vector3> smoothPath, PathfindingSettings navSettings)
     {
-
         if (startPolyRef == 0 || endPolyRef == 0)
         {
             path.Clear();
@@ -35,7 +34,7 @@ public static class NavQueryExtensions
         path.Clear();
         smoothPath.Clear();
 
-        navQuery.FindPath(startPolyRef, endPolyRef, start, end, filter, path, out int visitedPolysCount, path.Length);
+        navQuery.FindPath(startPolyRef, endPolyRef, start, end, filter, path, out var visitedPolysCount, path.Length);
 
         if (0 >= visitedPolysCount) return DtStatus.DT_FAILURE;
 
@@ -54,7 +53,7 @@ public static class NavQueryExtensions
         while (0 < visitedPolysCount && smoothPath.Count < navSettings.MaxSmoothing)
         {
             // Find location to steer towards.
-            if (!DtPathUtils.GetSteerTarget(navQuery, iterPos, targetPos, SLOP, path, visitedPolysCount, out var steerPos, out var steerPosFlag, out _))
+            if (!DtPathUtils.GetSteerTarget(navQuery, iterPos, targetPos, SLOP, path, visitedPolysCount, out var steerPos, out var steerPosFlag, out var steerPosRef))
             {
                 break;
             }
@@ -77,11 +76,11 @@ public static class NavQueryExtensions
             RcVec3f moveTgt = RcVec.Mad(iterPos, delta, len);
 
             // Move
-            navQuery.MoveAlongSurface(path[0], iterPos, moveTgt, filter, out var result, path, out _, path.Length);
+            navQuery.MoveAlongSurface(path[0], iterPos, moveTgt, filter, out var result, path, out var nvisited, path.Length);
 
             iterPos = result;
 
-            visitedPolysCount = DtPathUtils.MergeCorridorStartMoved(path, visitedPolysCount, path.Length, path, 0);
+            visitedPolysCount = DtPathUtils.MergeCorridorStartMoved(path, visitedPolysCount, path.Length, path, nvisited);
             visitedPolysCount = DtPathUtils.FixupShortcuts(path, visitedPolysCount, navQuery);
 
             var status = navQuery.GetPolyHeight(path[0], result, out var h);
@@ -99,5 +98,4 @@ public static class NavQueryExtensions
 
         return DtStatus.DT_SUCCESS;
     }
-
 }
