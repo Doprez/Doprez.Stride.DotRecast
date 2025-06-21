@@ -2,7 +2,6 @@
 using DotRecast.Core;
 using DotRecast.Recast;
 using Stride.Core;
-using Stride.Core.Diagnostics;
 using Stride.Core.Mathematics;
 using Stride.Engine;
 using System.Runtime.InteropServices;

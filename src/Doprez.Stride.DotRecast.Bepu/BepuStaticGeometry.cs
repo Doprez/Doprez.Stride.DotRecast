@@ -27,12 +27,14 @@ public class BepuStaticGeometry : BaseGeometryProvider
         // Only use StaticColliders for the nav mesh build.
         if (collidable is not StaticComponent)
         {
+            _logger.Info($"Entity {entity.Name} does not have a {nameof(StaticComponent)}. Only StaticColliders are supported for navigation mesh generation.");
             shapeData = null;
             return false;
         }
 
         if (!CollidersToInclude.IsSet(collidable.CollisionLayer))
         {
+            _logger.Info($"Entity {entity.Name} is not part of a valid collision layer.");
             shapeData = null;
             return false;
         }

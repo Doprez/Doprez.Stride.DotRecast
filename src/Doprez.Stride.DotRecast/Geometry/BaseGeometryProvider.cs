@@ -15,7 +15,7 @@ public abstract class BaseGeometryProvider
     }
 
     /// <summary>
-    /// Tries to get the shape information for the geometry.
+    /// Tries to get the shape information for the geometry. The geometry data should be returned with left handed winding and in world space.
     /// </summary>
     /// <returns></returns>
     public abstract bool TryGetTransformedShapeInfo(Entity entity, out GeometryData? shapeData);
