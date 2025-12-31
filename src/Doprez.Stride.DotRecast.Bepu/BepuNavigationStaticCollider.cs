@@ -42,7 +42,7 @@ public class BepuNavigationStaticCollider : BaseNavigationCollider
 
     public override void Initialize(Entity entity, IServiceRegistry services)
     {
-        var bepuGeom = new BepuStaticGeometry();
+        var bepuGeom = new BepuGeometryProvider();
         bepuGeom.Initialize(services);
 
         if (bepuGeom.TryGetTransformedShapeInfo(entity, out GeometryData? shapeData))
@@ -62,7 +62,7 @@ public class BepuNavigationStaticCollider : BaseNavigationCollider
 
     public override GeometryData? GetGeometry(Entity entity, IServiceRegistry services)
     {
-        var bepuGeom = new BepuStaticGeometry();
+        var bepuGeom = new BepuGeometryProvider();
         bepuGeom.Initialize(services);
 
         if (bepuGeom.TryGetTransformedShapeInfo(entity, out GeometryData? shapeData))
