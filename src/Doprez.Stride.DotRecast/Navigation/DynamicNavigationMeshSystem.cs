@@ -2,10 +2,6 @@
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 #pragma warning disable SA1402 // File may only contain a single type
 
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using Doprez.Stride.DotRecast.Navigation.Processors;
 using Stride.Core;
 using Stride.Core.Mathematics;
@@ -14,7 +10,6 @@ using Stride.Engine;
 using Stride.Engine.Design;
 using Stride.Engine.Processors;
 using Stride.Games;
-using Doprez.Stride.DotRecast.Navigation.Processors;
 
 namespace Doprez.Stride.DotRecast.Navigation
 {
@@ -57,7 +52,7 @@ namespace Doprez.Stride.DotRecast.Navigation
 
         private SceneSystem sceneSystem;
         private ScriptSystem scriptSystem;
-        private StaticColliderProcessor processor;
+        private DotRecastColliderProcessor processor;
 
         public DynamicNavigationMeshSystem(IServiceRegistry registry) : base(registry)
         {
@@ -227,7 +222,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             if (currentSceneInstance != null)
             {
                 // Scan for components
-                processor = new StaticColliderProcessor();
+                processor = new DotRecastColliderProcessor();
                 processor.ColliderAdded += ProcessorOnColliderAdded;
                 processor.ColliderRemoved += ProcessorOnColliderRemoved;
                 currentSceneInstance.Processors.Add(processor);

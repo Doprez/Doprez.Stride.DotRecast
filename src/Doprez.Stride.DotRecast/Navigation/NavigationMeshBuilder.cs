@@ -1,10 +1,6 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net) and Silicon Studio Corp. (https://www.siliconstudio.co.jp)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
 using Stride.Core.Diagnostics;
 using Stride.Core.Extensions;
 using Stride.Core.Mathematics;
@@ -12,7 +8,6 @@ using Stride.Core.Threading;
 using Stride.Engine;
 using Stride.Graphics;
 using Stride.Graphics.GeometricPrimitives;
-using Stride.Physics;
 
 namespace Doprez.Stride.DotRecast.Navigation
 {

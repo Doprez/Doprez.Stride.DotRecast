@@ -3,7 +3,6 @@ using Doprez.Stride.DotRecast.Geometry;
 using DotRecast.Core.Numerics;
 using DotRecast.Detour;
 using DotRecast.Detour.Dynamic;
-using DotRecast.Recast.Toolset;
 using Stride.Core;
 using Stride.Core.Mathematics;
 using Stride.Engine;
