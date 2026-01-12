@@ -1,7 +1,6 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net) and Silicon Studio Corp. (https://www.siliconstudio.co.jp)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
-using System.Collections.Generic;
 using DotRecast.Detour;
 using Stride.Core;
 using Stride.Core.Mathematics;
@@ -12,9 +11,9 @@ namespace Doprez.Stride.DotRecast.Navigation
     /// <summary>
     /// Tiles contained within <see cref="NavigationMeshLayer"/>
     /// </summary>
-    [DataContract("NavigationMeshTile")]
-    [DataSerializer(typeof(NavigationMeshTileSerializer))]
-    public class NavigationMeshTile
+    [DataContract(nameof(DotRecastNavigationMeshTile))]
+    //[DataSerializer(typeof(NavigationMeshTileSerializer))]
+    public class DotRecastNavigationMeshTile
     {
         /// <summary>
         /// Binary data of the built navigation mesh tile
@@ -72,7 +71,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// Serializes individually build tiles inside navigation meshes
         /// </summary>
-        internal class NavigationMeshTileSerializer : DataSerializer<NavigationMeshTile>
+        internal class NavigationMeshTileSerializer : DataSerializer<DotRecastNavigationMeshTile>
         {
             private DataSerializer<Vector3> pointSerializer;
 
@@ -81,12 +80,12 @@ namespace Doprez.Stride.DotRecast.Navigation
                 pointSerializer = MemberSerializer<Vector3>.Create(serializerSelector);
             }
 
-            public override void Serialize(ref NavigationMeshTile tile, ArchiveMode mode, SerializationStream stream)
+            public override void Serialize(ref DotRecastNavigationMeshTile tile, ArchiveMode mode, SerializationStream stream)
             {
                 var serializer = new DtMeshDataSerializer(stream);
                 if (mode == ArchiveMode.Deserialize)
                 {
-                    tile = new NavigationMeshTile()
+                    tile = new DotRecastNavigationMeshTile()
                     {
                         Data = new DtMeshData()
                     };

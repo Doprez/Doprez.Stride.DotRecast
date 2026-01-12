@@ -7,17 +7,17 @@ using Stride.Engine;
 using Stride.Engine.Design;
 using Doprez.Stride.DotRecast.Navigation.Processors;
 
-namespace Doprez.Stride.DotRecast.Navigation
+namespace Doprez.Stride.DotRecast.Navigation.Components
 {
     /// <summary>
     /// This is used to interface with the navigation mesh. Supports TryFindPath and Raycast
     /// </summary>
-    [DataContract("NavigationComponent")]
+    [DataContract(nameof(DotRecastNavigationComponent))]
     [Display("Navigation", Expand = ExpandRule.Once)]
     [ComponentOrder(20000)]
     [DefaultEntityComponentProcessor(typeof(NavigationProcessor), ExecutionMode = ExecutionMode.Runtime)]
     [ComponentCategory("Navigation")]
-    public class NavigationComponent : EntityComponent
+    public class DotRecastNavigationComponent : EntityComponent
     {
         [DataMemberIgnore]
         internal RecastNavigationMesh RecastNavigationMesh;
@@ -26,13 +26,13 @@ namespace Doprez.Stride.DotRecast.Navigation
         internal Vector3 SceneOffset;
 
         [DataMemberIgnore]
-        internal NavigationMeshGroup Group;
+        internal DotRecastNavigationMeshGroup Group;
 
         /// <summary>
         /// The navigation mesh which is being used. Setting this to <c>null</c> will load the dynamic navigation mesh for the current game (if enabled)
         /// </summary>
         [DataMember(10)]
-        public NavigationMesh NavigationMesh
+        public DotRecastNavigationMesh NavigationMesh
         {
             get;
             set

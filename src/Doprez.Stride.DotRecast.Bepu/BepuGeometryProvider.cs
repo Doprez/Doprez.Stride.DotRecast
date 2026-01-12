@@ -20,7 +20,13 @@ public class BepuGeometryProvider : BaseGeometryProvider
 
     private readonly Logger _logger = GlobalLogger.GetLogger(nameof(BepuGeometryProvider));
 
-    public override bool TryGetTransformedShapeInfo(Entity entity, out GeometryData? shapeData)
+    public override bool TryGetComponent(Entity entity, out EntityComponent component)
+    {
+        component = entity.Get<StaticComponent>();
+        return component != null;
+    }
+
+    public override bool TryGetTransformedShapeInfo(Entity entity, out GeometryData shapeData)
     {
         var collidable = entity.Get<CollidableComponent>();
 
@@ -28,30 +34,32 @@ public class BepuGeometryProvider : BaseGeometryProvider
         if (collidable is not StaticComponent)
         {
             _logger.Info($"Entity {entity.Name} does not have a {nameof(StaticComponent)}. Only StaticColliders are supported for navigation mesh generation.");
-            shapeData = null;
+            shapeData = new();
             return false;
         }
 
         if (!CollidersToInclude.IsSet(collidable.CollisionLayer))
         {
             _logger.Info($"Entity {entity.Name} is not part of a valid collision layer.");
-            shapeData = null;
+            shapeData = new();
             return false;
         }
 
         if(collidable.Collider is CompoundCollider compoundCollider)
         {
             shapeData = GetCompoundGeometry(compoundCollider, collidable.Entity.Transform.WorldMatrix);
+            shapeData ??= new();
             return shapeData != null;
         }
         else if (collidable.Collider is MeshCollider meshCollider)
         {
             shapeData = GetMeshGeometry(meshCollider, collidable.Entity.Transform.WorldMatrix);
+            shapeData ??= new();
             return shapeData != null;
         }
 
         _logger.Error($"Problem getting info from collider type {collidable.Collider.GetType().Name} for entity {collidable.Entity.Name}.");
-        shapeData = null;
+        shapeData = new();
         return false;
     }
 

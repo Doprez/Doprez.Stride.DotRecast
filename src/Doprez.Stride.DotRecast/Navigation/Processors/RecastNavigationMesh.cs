@@ -9,7 +9,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
     /// <summary>
     /// Recast native navigation mesh wrapper
     /// </summary>
-    public class RecastNavigationMesh(NavigationMesh navigationMesh)
+    public class RecastNavigationMesh(DotRecastNavigationMesh navigationMesh)
     {
         private readonly InternalNavigationMesh navmesh = new(navigationMesh.TileSize * navigationMesh.CellSize);
         private readonly HashSet<Point> tileCoordinates = [];

@@ -1,10 +1,7 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net) and Silicon Studio Corp. (https://www.siliconstudio.co.jp)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
+using Doprez.Stride.DotRecast.Navigation.Components;
 using Stride.Core;
 using Stride.Core.Annotations;
 using Stride.Core.Collections;
@@ -17,9 +14,9 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
     /// <summary>
     /// Manages the loading of the native side navigation meshes. Will only load one version of the navigation mesh if it is referenced by multiple components
     /// </summary>
-    public class NavigationProcessor : EntityProcessor<NavigationComponent, NavigationProcessor.AssociatedData>
+    public class NavigationProcessor : EntityProcessor<DotRecastNavigationComponent, NavigationProcessor.AssociatedData>
     {
-        private readonly Dictionary<NavigationMesh, NavigationMeshData> loadedNavigationMeshes = new();
+        private readonly Dictionary<DotRecastNavigationMesh, NavigationMeshData> loadedNavigationMeshes = new();
         private DynamicNavigationMeshSystem dynamicNavigationMeshSystem;
         private GameSystemCollection gameSystemCollection;
 
@@ -59,7 +56,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
         }
 
         /// <inheritdoc />
-        protected override AssociatedData GenerateComponentData(Entity entity, NavigationComponent component)
+        protected override AssociatedData GenerateComponentData(Entity entity, DotRecastNavigationComponent component)
         {
             return new AssociatedData
             {
@@ -68,13 +65,13 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
         }
 
         /// <inheritdoc />
-        protected override bool IsAssociatedDataValid(Entity entity, NavigationComponent component, AssociatedData associatedData)
+        protected override bool IsAssociatedDataValid(Entity entity, DotRecastNavigationComponent component, AssociatedData associatedData)
         {
             return component == associatedData.Component;
         }
 
         /// <inheritdoc />
-        protected override void OnEntityComponentAdding(Entity entity, NavigationComponent component, AssociatedData data)
+        protected override void OnEntityComponentAdding(Entity entity, DotRecastNavigationComponent component, AssociatedData data)
         {
             UpdateNavigationMesh(data);
 
@@ -83,7 +80,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
         }
 
         /// <inheritdoc />
-        protected override void OnEntityComponentRemoved(Entity entity, NavigationComponent component, AssociatedData data)
+        protected override void OnEntityComponentRemoved(Entity entity, DotRecastNavigationComponent component, AssociatedData data)
         {
             data.Component.NavigationMeshChanged -= ComponentOnNavigationMeshChanged;
         }
@@ -117,7 +114,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
 
                     foreach (var updatedTileCoord in layerUpdateInfo.UpdatedTiles)
                     {
-                        NavigationMeshTile newTile = null;
+                        DotRecastNavigationMeshTile newTile = null;
                         if (newLayer != null)
                         {
                             if (!newLayer.Tiles.TryGetValue(updatedTileCoord, out newTile))
@@ -149,7 +146,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
 
         private void ComponentOnNavigationMeshChanged(object sender, EventArgs eventArgs)
         {
-            var data = ComponentDatas[(NavigationComponent)sender];
+            var data = ComponentDatas[(DotRecastNavigationComponent)sender];
             UpdateNavigationMesh(data);
         }
 
@@ -200,7 +197,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
         /// Loads or references a <see cref="RecastNavigationMesh"/> for a group of a navigation mesh
         /// </summary>
         [CanBeNull]
-        private NavigationMeshGroupData Load(NavigationMesh mesh, Guid groupId)
+        private NavigationMeshGroupData Load(DotRecastNavigationMesh mesh, Guid groupId)
         {
             if (mesh == null || groupId == Guid.Empty)
                 return null;
@@ -265,7 +262,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
         /// </summary>
         public class AssociatedData
         {
-            internal NavigationComponent Component;
+            internal DotRecastNavigationComponent Component;
             internal NavigationMeshGroupData LoadedGroup;
         }
 
@@ -274,7 +271,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
         /// </summary>
         internal class NavigationMeshData
         {
-            public NavigationMesh NavigationMesh;
+            public DotRecastNavigationMesh NavigationMesh;
             public readonly Dictionary<Guid, NavigationMeshGroupData> LoadedGroups = new();
         }
 

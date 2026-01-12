@@ -21,7 +21,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// The generated navigation mesh
         /// </summary>
-        public NavigationMesh NavigationMesh;
+        public DotRecastNavigationMesh NavigationMesh;
 
         /// <summary>
         /// List of updated layers + tiles

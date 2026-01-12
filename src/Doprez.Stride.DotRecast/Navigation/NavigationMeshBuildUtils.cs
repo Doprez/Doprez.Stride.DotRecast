@@ -1,11 +1,9 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net) and Silicon Studio Corp. (https://www.siliconstudio.co.jp)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
-using System;
-using System.Collections.Generic;
+using Doprez.Stride.DotRecast.Recast.Components;
 using Stride.Core.Mathematics;
 using Stride.Engine;
-using Stride.Physics;
 
 namespace Doprez.Stride.DotRecast.Navigation
 {
@@ -20,7 +18,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <param name="settings"></param>
         /// <param name="boundingBox"></param>
         /// <returns></returns>
-        public static List<Point> GetOverlappingTiles(NavigationMeshBuildSettings settings, BoundingBox boundingBox)
+        public static List<Point> GetOverlappingTiles(DotRecastNavigationMeshBuildSettings settings, BoundingBox boundingBox)
         {
             List<Point> ret = [];
             float tcs = settings.TileSize * settings.CellSize;
@@ -43,11 +41,11 @@ namespace Doprez.Stride.DotRecast.Navigation
         }
         
         /// <summary>
-        /// Snaps a <see cref="BoundingBox"/>'s height according to the given <see cref="NavigationMeshBuildSettings"/>
+        /// Snaps a <see cref="BoundingBox"/>'s height according to the given <see cref="DotRecastNavigationMeshBuildSettings"/>
         /// </summary>
         /// <param name="settings">The build settings</param>
         /// <param name="boundingBox">Reference to the bounding box to snap</param>
-        public static void SnapBoundingBoxToCellHeight(NavigationMeshBuildSettings settings, ref BoundingBox boundingBox)
+        public static void SnapBoundingBoxToCellHeight(DotRecastNavigationMeshBuildSettings settings, ref BoundingBox boundingBox)
         {
             // Snap Y to tile height to avoid height differences between tiles
             boundingBox.Minimum.Y = MathF.Floor(boundingBox.Minimum.Y / settings.CellHeight) * settings.CellHeight;
@@ -57,7 +55,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// Calculates X-Z span for a navigation mesh tile. The Y-axis will span from <see cref="float.MinValue"/> to <see cref="float.MaxValue"/>
         /// </summary>
-        public static BoundingBox CalculateTileBoundingBox(NavigationMeshBuildSettings settings, Point tileCoord)
+        public static BoundingBox CalculateTileBoundingBox(DotRecastNavigationMeshBuildSettings settings, Point tileCoord)
         {
             float tcs = settings.TileSize * settings.CellSize;
             Vector2 tileMin = new Vector2(tileCoord.X * tcs, tileCoord.Y * tcs);
@@ -131,77 +129,19 @@ namespace Doprez.Stride.DotRecast.Navigation
         }
 
         /// <summary>
-        /// Checks if a static collider passes the given filter group
-        /// </summary>
-        /// <param name="collider">The collider to check</param>
-        /// <param name="includedCollisionGroups">The collision filter</param>
-        /// <returns><c>true</c> if the collider passes the filter, <c>false</c> otherwise</returns>
-        public static bool CheckColliderFilter(StaticColliderComponent collider, CollisionFilterGroupFlags includedCollisionGroups)
-        {
-            return ((CollisionFilterGroupFlags)collider.CollisionGroup & includedCollisionGroups) != 0;
-        }
-
-        /// <summary>
         /// Hashes and entity's transform and it's collider shape settings
         /// </summary>
         /// <param name="collider">The collider to hash</param>
         /// <param name="includedCollisionGroups">The filter group for active collides, 
         ///     which is used to hash if this colliders participates in the navigation mesh build</param>
         /// <returns></returns>
-        public static int HashEntityCollider(StaticColliderComponent collider, CollisionFilterGroupFlags includedCollisionGroups)
+        public static int HashEntityCollider(EntityComponent collider, NavMeshLayerGroup includedCollisionGroups)
         {
             int hash = 0;
             hash = (hash * 397) ^ collider.Entity.Transform.WorldMatrix.GetHashCode();
-            hash = (hash * 397) ^ collider.Enabled.GetHashCode();
-            hash = (hash * 397) ^ collider.IsTrigger.GetHashCode();
-            hash = (hash * 397) ^ CheckColliderFilter(collider, includedCollisionGroups).GetHashCode();
-            foreach (var shape in collider.ColliderShapes)
-            {
-                hash = (hash * 397) ^ shape.GetType().GetHashCode();
-                hash = (hash * 397) ^ shape.GetHashCode();
-            }
+            //hash = (hash * 397) ^ collider.Enabled.GetHashCode();
+            //hash = (hash * 397) ^ CheckColliderFilter(collider, includedCollisionGroups).GetHashCode();
             return hash;
-        }
-
-        /// <summary>
-        /// Checks if a static collider has latest collider shape
-        /// </summary>
-        /// <param name="collider">The collider to check</param>
-        /// <returns><c>true</c> if the collider has latest collider shape, <c>false</c> otherwise</returns>
-        public static bool HasLatestColliderShape(StaticColliderComponent collider)
-        {
-            if (collider.ColliderShape == null)
-            {
-                return false;
-            }
-
-            if (collider.ColliderShapes.Count == 1)
-            {
-                if (!collider.ColliderShapes[0].Match(collider.ColliderShape.Description))
-                {
-                    return false;
-                }
-            }
-            else
-            {
-                var compound = collider.ColliderShape as CompoundColliderShape;
-                if ((compound != null) && (compound.Count == collider.ColliderShapes.Count))
-                {
-                    for (int i = 0; i < compound.Count; ++i)
-                    {
-                        if (!collider.ColliderShapes[i].Match(compound[i].Description))
-                        {
-                            return false;
-                        }
-                    }
-                }
-                else
-                {
-                    return false;
-                }
-            }
-
-            return true;
         }
     }
 }

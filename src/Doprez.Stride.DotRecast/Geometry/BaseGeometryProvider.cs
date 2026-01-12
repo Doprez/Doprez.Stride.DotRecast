@@ -18,5 +18,12 @@ public abstract class BaseGeometryProvider
     /// Tries to get the shape information for the geometry. The geometry data should be returned with left handed winding and in world space.
     /// </summary>
     /// <returns></returns>
-    public abstract bool TryGetTransformedShapeInfo(Entity entity, out GeometryData? shapeData);
+    public abstract bool TryGetTransformedShapeInfo(Entity entity, out GeometryData shapeData);
+
+    /// <summary>
+    /// Gets the Id of the component that provides the geometry from the entity.
+    /// </summary>
+    /// <param name="entity"></param>
+    /// <returns></returns>
+    public abstract bool TryGetComponent(Entity entity, out EntityComponent component);
 }

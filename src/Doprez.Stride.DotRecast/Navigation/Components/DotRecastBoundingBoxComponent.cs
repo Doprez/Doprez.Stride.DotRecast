@@ -7,16 +7,16 @@ using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Engine.Design;
 
-namespace Doprez.Stride.DotRecast.Navigation
+namespace Doprez.Stride.DotRecast.Navigation.Components
 {
     /// <summary>
     /// A three dimensional bounding box  using the scale of the owning entity as the box extent. This is used to limit the area in which navigation meshes are generated
     /// </summary>
     [DataContract]
-    [DefaultEntityComponentProcessor(typeof(BoundingBoxProcessor), ExecutionMode = ExecutionMode.All)]
-    [Display("Navigation bounding box")]
+    [DefaultEntityComponentProcessor(typeof(DotRecastBoundingBoxProcessor), ExecutionMode = ExecutionMode.Runtime)]
+    [Display("DotRecast bounding box")]
     [ComponentCategory("Navigation")]
-    public class NavigationBoundingBoxComponent : EntityComponent
+    public class DotRecastBoundingBoxComponent : EntityComponent
     {
         /// <summary>
         /// The size of one edge of the bounding box

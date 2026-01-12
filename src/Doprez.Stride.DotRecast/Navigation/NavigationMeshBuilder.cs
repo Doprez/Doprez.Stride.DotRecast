@@ -1,13 +1,13 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net) and Silicon Studio Corp. (https://www.siliconstudio.co.jp)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
+using Doprez.Stride.DotRecast.Geometry;
+using Stride.Core;
 using Stride.Core.Diagnostics;
 using Stride.Core.Extensions;
 using Stride.Core.Mathematics;
 using Stride.Core.Threading;
-using Stride.Engine;
 using Stride.Graphics;
-using Stride.Graphics.GeometricPrimitives;
 
 namespace Doprez.Stride.DotRecast.Navigation
 {
@@ -22,18 +22,24 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// </summary>
         public Logger Logger;
 
-        private NavigationMesh oldNavigationMesh;
+        private DotRecastNavigationMesh oldNavigationMesh;
 
         private readonly List<StaticColliderData> colliders = [];
         private readonly HashSet<Guid> registeredGuids = [];
+
+        private readonly IServiceRegistry _services;
+
+        private readonly BaseGeometryProvider[] _geometryProviders = [];
 
         /// <summary>
         /// Initializes the builder, optionally with a previous navigation mesh when building incrementally
         /// </summary>
         /// <param name="oldNavigationMesh">The previous navigation mesh, to allow incremental builds</param>
-        public NavigationMeshBuilder(NavigationMesh oldNavigationMesh = null)
+        public NavigationMeshBuilder(IServiceRegistry services, BaseGeometryProvider[] geometryProviders, DotRecastNavigationMesh oldNavigationMesh = null)
         {
             this.oldNavigationMesh = oldNavigationMesh;
+            _services = services;
+            _geometryProviders = geometryProviders;
         }
 
         /// <summary>
@@ -79,7 +85,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <param name="boundingBoxes">A collection of bounding boxes to use as the region for which to generate navigation mesh tiles</param>
         /// <param name="cancellationToken">A cancellation token to interrupt the build process</param>
         /// <returns>The build result</returns>
-        public NavigationMeshBuildResult Build(NavigationMeshBuildSettings buildSettings, ICollection<NavigationMeshGroup> groups, CollisionFilterGroupFlags includedCollisionGroups,
+        public NavigationMeshBuildResult  Build(DotRecastNavigationMeshBuildSettings buildSettings, ICollection<DotRecastNavigationMeshGroup> groups, NavMeshLayerGroup includedCollisionGroups,
             ICollection<BoundingBox> boundingBoxes, CancellationToken cancellationToken)
         {
             var lastCache = oldNavigationMesh?.Cache;
@@ -89,7 +95,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             {
                 Logger?.Warning("No group settings found");
                 result.Success = true;
-                result.NavigationMesh = new NavigationMesh();
+                result.NavigationMesh = new DotRecastNavigationMesh();
                 return result;
             }
 
@@ -109,7 +115,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             StaticColliderData[] collidersLocal;
             lock (colliders)
             {
-                collidersLocal = colliders.ToArray();
+                collidersLocal = [.. colliders];
             }
 
             BuildInput(collidersLocal, includedCollisionGroups);
@@ -118,14 +124,14 @@ namespace Doprez.Stride.DotRecast.Navigation
             lastCache = oldNavigationMesh?.Cache;
 
             // The new navigation mesh that will be created
-            result.NavigationMesh = new NavigationMesh
+            result.NavigationMesh = new DotRecastNavigationMesh
             {
                 CellSize = buildSettings.CellSize,
                 TileSize = buildSettings.TileSize
             };
 
             // Tile cache for this new navigation mesh
-            NavigationMeshCache newCache = result.NavigationMesh.Cache = new NavigationMeshCache();
+            DotRecastNavigationMeshCache newCache = result.NavigationMesh.Cache = new DotRecastNavigationMeshCache();
             newCache.SettingsHash = settingsHash;
 
             // Generate global bounding box for planes
@@ -136,21 +142,15 @@ namespace Doprez.Stride.DotRecast.Navigation
             }
 
             // Combine input and collect tiles to build
-            NavigationMeshInputBuilder sceneNavigationMeshInputBuilder = new NavigationMeshInputBuilder();
+            GeometryData sceneNavigationMeshInputBuilder = new();
             foreach (var colliderData in collidersLocal)
             {
-                if (colliderData.InputBuilder == null)
+                if (colliderData == null)
                     continue;
 
                 // Otherwise, skip building these tiles
                 sceneNavigationMeshInputBuilder.AppendOther(colliderData.InputBuilder);
-                newCache.Add(colliderData.Component, colliderData.InputBuilder, colliderData.Planes, colliderData.ParameterHash);
-
-                // Generate geometry for planes
-                foreach (var plane in colliderData.Planes)
-                {
-                    sceneNavigationMeshInputBuilder.AppendOther(BuildPlaneGeometry(plane, globalBoundingBox));
-                }
+                newCache.Add(colliderData.Component, colliderData.InputBuilder, colliderData.ParameterHash);
             }
 
             // TODO: Generate tile local mesh input data
@@ -228,7 +228,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                         }
                     }
 
-                    ConcurrentCollector<Tuple<Point, NavigationMeshTile>> builtTiles = new ConcurrentCollector<Tuple<Point, NavigationMeshTile>>(tilesToBuild.Count);
+                    ConcurrentCollector<Tuple<Point, DotRecastNavigationMeshTile>> builtTiles = new(tilesToBuild.Count);
                     Dispatcher.ForEach(tilesToBuild.ToArray(), tileCoordinate =>
                     {
                         // Allow cancellation while building tiles
@@ -236,11 +236,11 @@ namespace Doprez.Stride.DotRecast.Navigation
                             return;
 
                         // Builds the tile, or returns null when there is nothing generated for this tile (empty tile)
-                        NavigationMeshTile meshTile = BuildTile(tileCoordinate, buildSettings, currentAgentSettings, boundingBoxes,
+                        DotRecastNavigationMeshTile meshTile = BuildTile(tileCoordinate, buildSettings, currentAgentSettings, boundingBoxes,
                             inputVertices, inputIndices);
 
                         // Add the result to the list of built tiles
-                        builtTiles.Add(new Tuple<Point, NavigationMeshTile>(tileCoordinate, meshTile));
+                        builtTiles.Add(new Tuple<Point, DotRecastNavigationMeshTile>(tileCoordinate, meshTile));
                     });
 
                     if (cancellationToken.IsCancellationRequested)
@@ -318,10 +318,10 @@ namespace Doprez.Stride.DotRecast.Navigation
             return result;
         }
 
-        private NavigationMeshTile BuildTile(Point tileCoordinate, NavigationMeshBuildSettings buildSettings, NavigationAgentSettings agentSettings,
+        private DotRecastNavigationMeshTile BuildTile(Point tileCoordinate, DotRecastNavigationMeshBuildSettings buildSettings, DotRecastNavigationAgentSettings agentSettings,
             ICollection<BoundingBox> boundingBoxes, Vector3[] inputVertices, int[] inputIndices)
         {
-            NavigationMeshTile meshTile = null;
+            DotRecastNavigationMeshTile meshTile = null;
 
             // Include bounding boxes in tile height range
             BoundingBox tileBoundingBox = NavigationMeshBuildUtils.CalculateTileBoundingBox(buildSettings, tileCoordinate);
@@ -377,7 +377,7 @@ namespace Doprez.Stride.DotRecast.Navigation
 
                 if (generatedData.Success)
                 {
-                    meshTile = new NavigationMeshTile
+                    meshTile = new DotRecastNavigationMeshTile
                     {
                         // Copy the generated navigationMesh data
                         Data = generatedData.NavmeshData
@@ -391,226 +391,42 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// Rebuilds outdated triangle data for colliders and recalculates hashes storing everything in StaticColliderData
         /// </summary>
-        private void BuildInput(StaticColliderData[] collidersLocal, CollisionFilterGroupFlags includedCollisionGroups)
+        private void BuildInput(StaticColliderData[] collidersLocal, NavMeshLayerGroup includedCollisionGroups)
         {
-            NavigationMeshCache lastCache = oldNavigationMesh?.Cache;
+            DotRecastNavigationMeshCache lastCache = oldNavigationMesh?.Cache;
             
             bool clearCache = false;
-            
-            Dispatcher.ForEach(collidersLocal, colliderData =>
+
+            foreach(var colliderData in collidersLocal)
             {
                 var entity = colliderData.Component.Entity;
-                TransformComponent entityTransform = entity.Transform;
-                Matrix entityWorldMatrix = entityTransform.WorldMatrix;
 
-                NavigationMeshInputBuilder entityNavigationMeshInputBuilder = colliderData.InputBuilder = new NavigationMeshInputBuilder();
+                GeometryData entityNavigationMeshInputBuilder = colliderData.InputBuilder = new();
 
                 // Compute hash of collider and compare it with the previous build if there is one
                 colliderData.ParameterHash = NavigationMeshBuildUtils.HashEntityCollider(colliderData.Component, includedCollisionGroups);
                 colliderData.Previous = null;
                 if (lastCache?.Objects.TryGetValue(colliderData.Component.Id, out colliderData.Previous) ?? false)
                 {
-                    if ((!colliderData.Component.AlwaysUpdateNaviMeshCache) &&
-                        (colliderData.Previous.ParameterHash == colliderData.ParameterHash))
+                    if (colliderData.Previous.ParameterHash == colliderData.ParameterHash)
                     {
                         // In this case, we don't need to recalculate the geometry for this shape, since it wasn't changed
                         // here we take the triangle mesh from the previous build as the current
                         colliderData.InputBuilder = colliderData.Previous.InputBuilder;
-                        colliderData.Planes.Clear();
-                        colliderData.Planes.AddRange(colliderData.Previous.Planes);
                         colliderData.Processed = false;
                         return;
                     }
                 }
 
-                // Clear cache on removal of infinite planes
-                if (colliderData.Planes.Count > 0)
-                    clearCache = true;
-
-                // Clear planes
-                colliderData.Planes.Clear();
-
-                // Return empty data for disabled colliders, filtered out colliders or trigger colliders 
-                if (!colliderData.Component.Enabled || colliderData.Component.IsTrigger ||
-                    !NavigationMeshBuildUtils.CheckColliderFilter(colliderData.Component, includedCollisionGroups))
+                foreach(var provider in _geometryProviders)
                 {
-                    colliderData.Processed = true;
-                    return;
-                }
-
-                // Make sure shape is up to date
-                if (!NavigationMeshBuildUtils.HasLatestColliderShape(colliderData.Component))
-                {
-                    colliderData.Component.ComposeShape();
-                }
-
-                // Interate through all the colliders shapes while queueing all shapes in compound shapes to process those as well
-                Queue<ColliderShape> shapesToProcess = new Queue<ColliderShape>();
-                if (colliderData.Component.ColliderShape != null)
-                {
-                    shapesToProcess.Enqueue(colliderData.Component.ColliderShape);
-                    while (shapesToProcess.Count > 0)
+                    if (provider.TryGetTransformedShapeInfo(colliderData.Component.Entity, out var shapeData))
                     {
-                        var shape = shapesToProcess.Dequeue();
-                        var shapeType = shape.GetType();
-                        if (shapeType == typeof(BoxColliderShape))
-                        {
-                            var box = (BoxColliderShape)shape;
-                            var boxDesc = GetColliderShapeDesc<BoxColliderShapeDesc>(box.Description);
-                            Matrix transform = box.PositiveCenterMatrix * entityWorldMatrix;
-
-                            var meshData = GeometricPrimitive.Cube.New(boxDesc.Size, toLeftHanded: true);
-                            entityNavigationMeshInputBuilder.AppendMeshData(meshData, transform);
-                        }
-                        else if (shapeType == typeof(SphereColliderShape))
-                        {
-                            var sphere = (SphereColliderShape)shape;
-                            var sphereDesc = GetColliderShapeDesc<SphereColliderShapeDesc>(sphere.Description);
-                            Matrix transform = sphere.PositiveCenterMatrix * entityWorldMatrix;
-
-                            var meshData = GeometricPrimitive.Sphere.New(sphereDesc.Radius, toLeftHanded: true);
-                            entityNavigationMeshInputBuilder.AppendMeshData(meshData, transform);
-                        }
-                        else if (shapeType == typeof(CylinderColliderShape))
-                        {
-                            var cylinder = (CylinderColliderShape)shape;
-                            var cylinderDesc = GetColliderShapeDesc<CylinderColliderShapeDesc>(cylinder.Description);
-                            Matrix transform = cylinder.PositiveCenterMatrix * entityWorldMatrix;
-
-                            var meshData = GeometricPrimitive.Cylinder.New(cylinderDesc.Height, cylinderDesc.Radius, toLeftHanded: true);
-                            entityNavigationMeshInputBuilder.AppendMeshData(meshData, transform);
-                        }
-                        else if (shapeType == typeof(CapsuleColliderShape))
-                        {
-                            var capsule = (CapsuleColliderShape)shape;
-                            var capsuleDesc = GetColliderShapeDesc<CapsuleColliderShapeDesc>(capsule.Description);
-                            Matrix transform = capsule.PositiveCenterMatrix * entityWorldMatrix;
-
-                            var meshData = GeometricPrimitive.Capsule.New(capsuleDesc.Length, capsuleDesc.Radius, toLeftHanded: true);
-                            entityNavigationMeshInputBuilder.AppendMeshData(meshData, transform);
-                        }
-                        else if (shapeType == typeof(ConeColliderShape))
-                        {
-                            var cone = (ConeColliderShape)shape;
-                            var coneDesc = GetColliderShapeDesc<ConeColliderShapeDesc>(cone.Description);
-                            Matrix transform = cone.PositiveCenterMatrix * entityWorldMatrix;
-
-                            var meshData = GeometricPrimitive.Cone.New(coneDesc.Radius, coneDesc.Height, toLeftHanded: true);
-                            entityNavigationMeshInputBuilder.AppendMeshData(meshData, transform);
-                        }
-                        else if (shapeType == typeof(StaticPlaneColliderShape))
-                        {
-                            var planeShape = (StaticPlaneColliderShape)shape;
-                            var planeDesc = GetColliderShapeDesc<StaticPlaneColliderShapeDesc>(planeShape.Description);
-                            Matrix transform = entityWorldMatrix;
-
-                            Plane plane = new Plane(planeDesc.Normal, planeDesc.Offset)
-                            {
-                                // Pre-Transform plane parameters
-                                Normal = Vector3.TransformNormal(planeDesc.Normal, transform)
-                            };
-                            plane.Normal.Normalize();
-                            plane.D += Vector3.Dot(transform.TranslationVector, plane.Normal);
-
-                            colliderData.Planes.Add(plane);
-                        }
-                        else if (shapeType == typeof(ConvexHullColliderShape))
-                        {
-                            var hull = (ConvexHullColliderShape)shape;
-                            Matrix transform = hull.PositiveCenterMatrix * entityWorldMatrix;
-
-                            // Convert hull indices to int
-                            int[] indices = new int[hull.Indices.Count];
-                            if (hull.Indices.Count % 3 != 0) throw new InvalidOperationException($"{shapeType} does not consist of triangles");
-                            for (int i = 0; i < hull.Indices.Count; i += 3)
-                            {
-                                indices[i] = (int)hull.Indices[i];
-                                indices[i + 2] = (int)hull.Indices[i + 1]; // NOTE: Reversed winding to create left handed input
-                                indices[i + 1] = (int)hull.Indices[i + 2];
-                            }
-
-                            entityNavigationMeshInputBuilder.AppendArrays(hull.Points.ToArray(), indices, transform);
-                        }
-                        else if (shapeType == typeof(StaticMeshColliderShape))
-                        {
-                            var mesh = (StaticMeshColliderShape)shape;
-                            Matrix transform = mesh.PositiveCenterMatrix * entityWorldMatrix;
-
-                            mesh.GetMeshDataCopy(out var verts, out var indices);
-
-                            // Convert hull indices to int
-                            if (indices.Length % 3 != 0) throw new InvalidOperationException($"{shapeType} does not consist of triangles");
-                            for (int i = 0; i < indices.Length; i += 3)
-                            {
-                                // NOTE: Reversed winding to create left handed input
-                                (indices[i + 1], indices[i + 2]) = (indices[i + 2], indices[i + 1]);
-                            }
-
-                            entityNavigationMeshInputBuilder.AppendArrays(verts, indices, transform);
-                        }
-                        else if (shapeType == typeof(HeightfieldColliderShape))
-                        {
-                            var heightfield = (HeightfieldColliderShape)shape;
-
-                            var halfRange = (heightfield.MaxHeight - heightfield.MinHeight) * 0.5f;
-                            var offset = -(heightfield.MinHeight + halfRange);
-                            Matrix transform = Matrix.Translation(new Vector3(0, offset, 0)) * heightfield.PositiveCenterMatrix * entityWorldMatrix;
-
-                            var width = heightfield.HeightStickWidth - 1;
-                            var length = heightfield.HeightStickLength - 1;
-                            var mesh = GeometricPrimitive.Plane.New(width, length, width, length, normalDirection: NormalDirection.UpY, toLeftHanded: true);
-
-                            var arrayLength = heightfield.HeightStickWidth * heightfield.HeightStickLength;
-
-                            using (heightfield.LockToReadHeights())
-                            {
-                                switch (heightfield.HeightType)
-                                {
-                                    case HeightfieldTypes.Short:
-                                        if (heightfield.ShortArray == null) continue;
-                                        for (int i = 0; i < arrayLength; ++i)
-                                        {
-                                            mesh.Vertices[i].Position.Y = heightfield.ShortArray[i] * heightfield.HeightScale;
-                                        }
-                                        break;
-                                    case HeightfieldTypes.Byte:
-                                        if (heightfield.ByteArray == null) continue;
-                                        for (int i = 0; i < arrayLength; ++i)
-                                        {
-                                            mesh.Vertices[i].Position.Y = heightfield.ByteArray[i] * heightfield.HeightScale;
-                                        }
-                                        break;
-                                    case HeightfieldTypes.Float:
-                                        if (heightfield.FloatArray == null) continue;
-                                        for (int i = 0; i < arrayLength; ++i)
-                                        {
-                                            mesh.Vertices[i].Position.Y = heightfield.FloatArray[i];
-                                        }
-                                        break;
-                                }
-                            }
-
-                            entityNavigationMeshInputBuilder.AppendMeshData(mesh, transform);
-                        }
-                        else if (shapeType == typeof(CompoundColliderShape))
-                        {
-                            // Unroll compound collider shapes
-                            var compound = (CompoundColliderShape)shape;
-                            for (int i = 0; i < compound.Count; i++)
-                            {
-                                shapesToProcess.Enqueue(compound[i]);
-                            }
-                        }
+                        // Append geometry from the provider
+                        entityNavigationMeshInputBuilder.AppendOther(shapeData);
                     }
                 }
-
-                // Clear cache on addition of infinite planes
-                if (colliderData.Planes.Count > 0)
-                    clearCache = true;
-
-                // Mark collider as processed
-                colliderData.Processed = true;
-            });
+            }
 
             if (clearCache && oldNavigationMesh != null)
             {
@@ -621,7 +437,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// Marks tiles that should be built according to how much their geometry affects the navigation mesh and the bounding boxes specified for building
         /// </summary>
-        private void MarkTiles(NavigationMeshInputBuilder inputBuilder, ref NavigationMeshBuildSettings buildSettings, ref NavigationAgentSettings agentSettings, HashSet<Point> tilesToBuild)
+        private void MarkTiles(GeometryData inputBuilder, ref DotRecastNavigationMeshBuildSettings buildSettings, ref DotRecastNavigationAgentSettings agentSettings, HashSet<Point> tilesToBuild)
         {
             // Extend bounding box for agent size
             BoundingBox boundingBoxToCheck = inputBuilder.BoundingBox;
@@ -637,7 +453,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// Generates triangles for an infinite plane that will completely intersect the given bounding box
         /// </summary>
-        private NavigationMeshInputBuilder BuildPlaneGeometry(Plane plane, BoundingBox boundingBox)
+        private DotRecastNavigationMeshInputBuilder BuildPlaneGeometry(Plane plane, BoundingBox boundingBox)
         {
             Vector3 maxSize = boundingBox.Maximum - boundingBox.Minimum;
             float maxDiagonal = Math.Max(maxSize.X, Math.Max(maxSize.Y, maxSize.Z));
@@ -658,21 +474,9 @@ namespace Doprez.Stride.DotRecast.Navigation
 
             GeometricMeshData<VertexPositionNormalTexture> meshData = new GeometricMeshData<VertexPositionNormalTexture>(vertices, planeInds, true);
 
-            NavigationMeshInputBuilder inputBuilder = new NavigationMeshInputBuilder();
+            DotRecastNavigationMeshInputBuilder inputBuilder = new DotRecastNavigationMeshInputBuilder();
             inputBuilder.AppendMeshData(meshData, Matrix.Identity);
             return inputBuilder;
-        }
-
-        /// <summary>
-        /// Extract the collider shape description in the case of it being either an inline shape or an asset as shape
-        /// </summary>
-        private TColliderType GetColliderShapeDesc<TColliderType>(IColliderShapeDesc desc) where TColliderType : class, IColliderShapeDesc
-        {
-            if (desc is TColliderType direct)
-                return direct;
-            if (desc is not ColliderShapeAssetDesc asset)
-                throw new Exception("Invalid collider shape description");
-            return asset.Shape.Descriptions.First() as TColliderType;
         }
     }
 }

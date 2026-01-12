@@ -1,8 +1,6 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net) and Silicon Studio Corp. (https://www.siliconstudio.co.jp)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
-using System;
-using System.ComponentModel;
 using Stride.Core;
 using Stride.Core.Annotations;
 using Stride.Core.Reflection;
@@ -12,9 +10,9 @@ namespace Doprez.Stride.DotRecast.Navigation
     /// <summary>
     /// Provides settings for the navigation mesh builder to control granularity and error margins 
     /// </summary>
-    [DataContract]
+    [DataContract(nameof(DotRecastNavigationMeshBuildSettings))]
     [ObjectFactory(typeof(NavigationBuildSettingsFactory))]
-    public struct NavigationMeshBuildSettings
+    public struct DotRecastNavigationMeshBuildSettings
     {
         /// <summary>
         /// The Height of a grid cell in the navigation mesh building steps using heightfields. 
@@ -77,7 +75,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         [DataMemberRange(0.0, 3)]
         public float MaxDetailSamplingError;
 
-        public bool Equals(NavigationMeshBuildSettings other)
+        public bool Equals(DotRecastNavigationMeshBuildSettings other)
         {
             return CellHeight.Equals(other.CellHeight) && CellSize.Equals(other.CellSize) && TileSize == other.TileSize && MinRegionArea.Equals(other.MinRegionArea) &&
                    RegionMergeArea.Equals(other.RegionMergeArea) && MaxEdgeLen.Equals(other.MaxEdgeLen) && MaxEdgeError.Equals(other.MaxEdgeError) &&
@@ -87,7 +85,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         public override bool Equals(object obj)
         {
             if (ReferenceEquals(null, obj)) return false;
-            return obj is NavigationMeshBuildSettings && Equals((NavigationMeshBuildSettings)obj);
+            return obj is DotRecastNavigationMeshBuildSettings && Equals((DotRecastNavigationMeshBuildSettings)obj);
         }
 
         public override int GetHashCode()
@@ -112,7 +110,7 @@ namespace Doprez.Stride.DotRecast.Navigation
     {
         public object New(Type type)
         {
-            return new NavigationMeshBuildSettings
+            return new DotRecastNavigationMeshBuildSettings
             {
                 CellHeight = 0.2f,
                 CellSize = 0.3f,

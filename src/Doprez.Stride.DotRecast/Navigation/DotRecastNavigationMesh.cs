@@ -11,14 +11,14 @@ namespace Doprez.Stride.DotRecast.Navigation
     /// <summary>
     /// A Navigation Mesh, can be used for pathfinding.
     /// </summary>
-    [DataContract("NavigationMesh")]
-    [ReferenceSerializer, DataSerializerGlobal(typeof(ReferenceSerializer<NavigationMesh>), Profile = "Content")]
+    [DataContract(nameof(DotRecastNavigationMesh))]
+    [ReferenceSerializer, DataSerializerGlobal(typeof(ReferenceSerializer<DotRecastNavigationMesh>), Profile = "Content")]
     [DataSerializer(typeof(NavigationMeshSerializer))]
-    [ContentSerializer(typeof(DataContentSerializer<NavigationMesh>))]
-    public class NavigationMesh
+    [ContentSerializer(typeof(DataContentSerializer<DotRecastNavigationMesh>))]
+    public class DotRecastNavigationMesh
     {
         // Stores the cached build information to allow incremental building on this navigation mesh
-        internal NavigationMeshCache Cache;
+        internal DotRecastNavigationMeshCache Cache;
 
         internal float TileSize;
 
@@ -32,30 +32,30 @@ namespace Doprez.Stride.DotRecast.Navigation
         [DataMember]
         public IReadOnlyDictionary<Guid, NavigationMeshLayer> Layers => LayersInternal;
 
-        internal class NavigationMeshSerializer : DataSerializer<NavigationMesh>
+        internal class NavigationMeshSerializer : DataSerializer<DotRecastNavigationMesh>
         {
             private DictionarySerializer<Guid, NavigationMeshLayer> layersSerializer;
-            private DataSerializer<NavigationMeshCache> cacheSerializer;
+            private DataSerializer<DotRecastNavigationMeshCache> cacheSerializer;
 
             public override void Initialize(SerializerSelector serializerSelector)
             {
-                cacheSerializer = MemberSerializer<NavigationMeshCache>.Create(serializerSelector, false);
+                cacheSerializer = MemberSerializer<DotRecastNavigationMeshCache>.Create(serializerSelector, false);
                 
                 layersSerializer = new DictionarySerializer<Guid, NavigationMeshLayer>();
                 layersSerializer.Initialize(serializerSelector);
             }
 
-            public override void PreSerialize(ref NavigationMesh obj, ArchiveMode mode, SerializationStream stream)
+            public override void PreSerialize(ref DotRecastNavigationMesh obj, ArchiveMode mode, SerializationStream stream)
             {
                 base.PreSerialize(ref obj, mode, stream);
                 if (mode == ArchiveMode.Deserialize)
                 {
                     if (obj == null)
-                        obj = new NavigationMesh();
+                        obj = new DotRecastNavigationMesh();
                 }
             }
 
-            public override void Serialize(ref NavigationMesh obj, ArchiveMode mode, SerializationStream stream)
+            public override void Serialize(ref DotRecastNavigationMesh obj, ArchiveMode mode, SerializationStream stream)
             {
                 // Serialize tile size because it is needed
                 stream.Serialize(ref obj.TileSize);

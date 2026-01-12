@@ -11,26 +11,26 @@ using Stride.Core.Serialization.Serializers;
 namespace Doprez.Stride.DotRecast.Navigation
 {
     /// <summary>
-    /// Layer containing built tiles for a single <see cref="NavigationAgentSettings"/>
+    /// Layer containing built tiles for a single <see cref="DotRecastNavigationAgentSettings"/>
     /// </summary>
     [DataSerializer(typeof(NavigationMeshLayerSerializer))]
-    [ContentSerializer(typeof(DataContentSerializer<NavigationMesh>))]
+    [ContentSerializer(typeof(DataContentSerializer<DotRecastNavigationMesh>))]
     public class NavigationMeshLayer
     {
         // Backing field of Tiles
-        internal Dictionary<Point, NavigationMeshTile> TilesInternal = new();
+        internal Dictionary<Point, DotRecastNavigationMeshTile> TilesInternal = new();
 
         /// <summary>
         /// Contains all the built tiles mapped to their tile coordinates
         /// </summary>
-        public IReadOnlyDictionary<Point, NavigationMeshTile> Tiles => TilesInternal;
+        public IReadOnlyDictionary<Point, DotRecastNavigationMeshTile> Tiles => TilesInternal;
 
         /// <summary>
         /// Tries to find a built tile inside this layer
         /// </summary>
         /// <param name="tileCoordinate">The coordinate of the tile</param>
         /// <returns>The found tile or null</returns>
-        public NavigationMeshTile FindTile(Point tileCoordinate)
+        public DotRecastNavigationMeshTile FindTile(Point tileCoordinate)
         {
             if (TilesInternal.TryGetValue(tileCoordinate, out var foundTile))
                 return foundTile;
@@ -39,11 +39,11 @@ namespace Doprez.Stride.DotRecast.Navigation
 
         internal class NavigationMeshLayerSerializer : DataSerializer<NavigationMeshLayer>
         {
-            private DictionarySerializer<Point, NavigationMeshTile> tilesSerializer;
+            private DictionarySerializer<Point, DotRecastNavigationMeshTile> tilesSerializer;
 
             public override void Initialize(SerializerSelector serializerSelector)
             {
-                tilesSerializer = new DictionarySerializer<Point, NavigationMeshTile>();
+                tilesSerializer = new DictionarySerializer<Point, DotRecastNavigationMeshTile>();
                 tilesSerializer.Initialize(serializerSelector);
             }
 

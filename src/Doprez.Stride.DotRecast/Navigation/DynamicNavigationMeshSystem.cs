@@ -1,13 +1,11 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net) and Silicon Studio Corp. (https://www.siliconstudio.co.jp)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
-#pragma warning disable SA1402 // File may only contain a single type
 
+using Doprez.Stride.DotRecast.Navigation.Components;
 using Doprez.Stride.DotRecast.Navigation.Processors;
 using Stride.Core;
 using Stride.Core.Mathematics;
-using Stride.Core.Reflection;
 using Stride.Engine;
-using Stride.Engine.Design;
 using Stride.Engine.Processors;
 using Stride.Games;
 
@@ -24,39 +22,21 @@ namespace Doprez.Stride.DotRecast.Navigation
         [DataMember(5)]
         public bool AutomaticRebuild { get; set; } = true;
 
-        /// <summary>
-        /// Collision filter that indicates which colliders are used in navmesh generation
-        /// </summary>
-        [DataMember(10)]
-        public CollisionFilterGroupFlags IncludedCollisionGroups { get; set; }
-
-        /// <summary>
-        /// Build settings used by Recast
-        /// </summary>
-        [DataMember(20)]
-        public NavigationMeshBuildSettings BuildSettings { get; set; }
-
-        /// <summary>
-        /// Settings for agents used with the dynamic navigation mesh
-        /// </summary>
-        [DataMember(30)]
-        public List<NavigationMeshGroup> Groups { get; private set; } = [];
-
         private bool pendingRebuild = true;
 
         private SceneInstance currentSceneInstance;
-
-        private NavigationMeshBuilder builder = new();
 
         private CancellationTokenSource buildTaskCancellationTokenSource;
 
         private SceneSystem sceneSystem;
         private ScriptSystem scriptSystem;
-        private DotRecastColliderProcessor processor;
+        private DotRecastNavigationMeshProcessor processor;
+
+        private List<DotRecastNavigationMeshComponent> _navigationMeshComponents = [];
 
         public DynamicNavigationMeshSystem(IServiceRegistry registry) : base(registry)
         {
-            Enabled = false;
+            Enabled = true;
             EnabledChanged += OnEnabledChanged;
         }
 
@@ -68,45 +48,14 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// The most recently built navigation mesh
         /// </summary>
-        public NavigationMesh CurrentNavigationMesh { get; private set; }
+        public DotRecastNavigationMesh CurrentNavigationMesh { get; private set; }
 
         /// <inheritdoc />
         public override void Initialize()
         {
             base.Initialize();
-
-            var gameSettings = Services.GetService<IGameSettingsService>()?.Settings;
-            if (gameSettings != null)
-            {
-                InitializeSettingsFromGameSettings(gameSettings);
-            }
-            else
-            {
-                // Initial build settings
-                BuildSettings = ObjectFactoryRegistry.NewInstance<NavigationMeshBuildSettings>();
-                IncludedCollisionGroups = CollisionFilterGroupFlags.AllFilter;
-                Groups = new List<NavigationMeshGroup>
-                {
-                    ObjectFactoryRegistry.NewInstance<NavigationMeshGroup>(),
-                };
-            }
-
             sceneSystem = Services.GetSafeServiceAs<SceneSystem>();
             scriptSystem = Services.GetSafeServiceAs<ScriptSystem>();
-        }
-
-        /// <summary>
-        /// Copies the default settings from the <see cref="GameSettings"/> for building navigation
-        /// </summary>
-        public void InitializeSettingsFromGameSettings(GameSettings gameSettings)
-        {
-            if (gameSettings == null)
-                throw new ArgumentNullException(nameof(gameSettings));
-
-            // Initialize build settings from game settings
-            var navigationSettings = gameSettings.Configurations.Get<NavigationSettings>();
-
-            InitializeSettingsFromNavigationSettings(navigationSettings);
         }
 
         /// <inheritdoc />
@@ -150,7 +99,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             buildTaskCancellationTokenSource = new CancellationTokenSource();
 
             // Collect bounding boxes
-            var boundingBoxProcessor = currentSceneInstance.GetProcessor<BoundingBoxProcessor>();
+            var boundingBoxProcessor = currentSceneInstance.GetProcessor<DotRecastBoundingBoxProcessor>();
             if (boundingBoxProcessor == null)
                 return new NavigationMeshBuildResult();
 
@@ -161,29 +110,41 @@ namespace Doprez.Stride.DotRecast.Navigation
                 boundingBoxes.Add(new BoundingBox(translation - boundingBox.Size * scale, translation + boundingBox.Size * scale));
             }
 
+            //foreach(var navMeshComponent in navigationMeshComponents)
+            //{
+            //    var buildSettings = navMeshComponent.BuildSettings;
+
+            //    var result = Task.Run(() =>
+            //    {
+            //        // Only have one active build at a time
+            //        lock (navMeshComponent.MeshBuilder)
+            //        {
+            //            return navMeshComponent.MeshBuilder.Build(buildSettings, navMeshComponent.Groups, navMeshComponent.IncludedCollisionGroups, boundingBoxes, buildTaskCancellationTokenSource.Token);
+            //        }
+            //    });
+
+            //    await result;
+
+            //    FinalizeRebuild(result);
+
+            //    return result.Result;
+            //}
+            var buildSettings = _navigationMeshComponents[0].BuildSettings;
+
             var result = Task.Run(() =>
             {
                 // Only have one active build at a time
-                lock (builder)
+                lock (_navigationMeshComponents[0].MeshBuilder)
                 {
-                    return builder.Build(BuildSettings, Groups, IncludedCollisionGroups,  boundingBoxes, buildTaskCancellationTokenSource.Token);
+                    return _navigationMeshComponents[0].MeshBuilder.Build(buildSettings, _navigationMeshComponents[0].Groups, _navigationMeshComponents[0].IncludedCollisionGroups, boundingBoxes, buildTaskCancellationTokenSource.Token);
                 }
             });
+
             await result;
 
             FinalizeRebuild(result);
 
             return result.Result;
-        }
-
-        internal void InitializeSettingsFromNavigationSettings(NavigationSettings navigationSettings)
-        {
-            BuildSettings = navigationSettings.BuildSettings;
-            IncludedCollisionGroups = navigationSettings.IncludedCollisionGroups;
-            Groups = navigationSettings.Groups;
-            Enabled = navigationSettings.EnableDynamicNavigationMesh;
-
-            pendingRebuild = true;
         }
 
         private void FinalizeRebuild(Task<NavigationMeshBuildResult> resultTask)
@@ -208,12 +169,9 @@ namespace Doprez.Stride.DotRecast.Navigation
                 if (processor != null)
                 {
                     currentSceneInstance.Processors.Remove(processor);
-                    processor.ColliderAdded -= ProcessorOnColliderAdded;
-                    processor.ColliderRemoved -= ProcessorOnColliderRemoved;
+                    processor.SettingsAdded -= ProcessorOnColliderAdded;
+                    processor.SettingsRemoved -= ProcessorOnColliderRemoved;
                 }
-
-                // Clear builder
-                builder = new NavigationMeshBuilder();
             }
 
             // Set the correct scene
@@ -222,27 +180,27 @@ namespace Doprez.Stride.DotRecast.Navigation
             if (currentSceneInstance != null)
             {
                 // Scan for components
-                processor = new DotRecastColliderProcessor();
-                processor.ColliderAdded += ProcessorOnColliderAdded;
-                processor.ColliderRemoved += ProcessorOnColliderRemoved;
+                processor = new();
+                processor.SettingsAdded += ProcessorOnColliderAdded;
+                processor.SettingsRemoved += ProcessorOnColliderRemoved;
                 currentSceneInstance.Processors.Add(processor);
 
                 pendingRebuild = true;
             }
         }
 
-        private void ProcessorOnColliderAdded(StaticColliderComponent component, StaticColliderData data)
+        private void ProcessorOnColliderAdded(DotRecastNavigationMeshComponent component)
         {
-            builder.Add(data);
+            _navigationMeshComponents.Add(component);
             if (AutomaticRebuild)
             {
                 pendingRebuild = true;
             }
         }
 
-        private void ProcessorOnColliderRemoved(StaticColliderComponent component, StaticColliderData data)
+        private void ProcessorOnColliderRemoved(DotRecastNavigationMeshComponent component)
         {
-            builder.Remove(data);
+            _navigationMeshComponents.Remove(component);
             if (AutomaticRebuild)
             {
                 pendingRebuild = true;
@@ -272,7 +230,7 @@ namespace Doprez.Stride.DotRecast.Navigation
 
     public class NavigationMeshUpdatedEventArgs : EventArgs
     {
-        public NavigationMesh OldNavigationMesh;
+        public DotRecastNavigationMesh OldNavigationMesh;
         public NavigationMeshBuildResult BuildResult;
     }
 }

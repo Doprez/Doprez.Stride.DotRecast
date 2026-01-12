@@ -1,15 +1,16 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net) and Silicon Studio Corp. (https://www.siliconstudio.co.jp)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
+using Doprez.Stride.DotRecast.Navigation.Components;
 using Stride.Core;
 using Stride.Engine;
 using Stride.Games;
 
 namespace Doprez.Stride.DotRecast.Navigation.Processors
 {
-    internal class BoundingBoxProcessor : EntityProcessor<NavigationBoundingBoxComponent>
+    internal class DotRecastBoundingBoxProcessor : EntityProcessor<DotRecastBoundingBoxComponent>
     {
-        public ICollection<NavigationBoundingBoxComponent> BoundingBoxes => ComponentDatas.Keys;
+        public ICollection<DotRecastBoundingBoxComponent> BoundingBoxes => ComponentDatas.Keys;
 
         protected override void OnSystemAdd()
         {

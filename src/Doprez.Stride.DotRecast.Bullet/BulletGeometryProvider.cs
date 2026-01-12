@@ -16,6 +16,11 @@ public class BulletGeometryProvider : BaseGeometryProvider
 
     private readonly Logger _logger = GlobalLogger.GetLogger(nameof(BulletGeometryProvider));
 
+    public override bool EntityHasValidGeometry(Entity entity)
+    {
+        return entity.Get<StaticColliderComponent>() != null;
+    }
+
     public override bool TryGetTransformedShapeInfo(Entity entity, out GeometryData? shapeData)
     {
         var collidable = entity.Get<StaticColliderComponent>();

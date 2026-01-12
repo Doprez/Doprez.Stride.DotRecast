@@ -12,9 +12,9 @@ namespace Doprez.Stride.DotRecast.Navigation
     /// <summary>
     /// Navigation agent
     /// </summary>
-    [DataContract]
+    [DataContract(nameof(DotRecastNavigationAgentSettings))]
     [ObjectFactory(typeof(NavigationAgentSettingsFactory))]
-    public class NavigationAgentSettings
+    public class DotRecastNavigationAgentSettings
     {
         /// <summary>
         /// Height of the actor
@@ -62,7 +62,7 @@ namespace Doprez.Stride.DotRecast.Navigation
     {
         public object New(Type type)
         {
-            return new NavigationAgentSettings
+            return new DotRecastNavigationAgentSettings
             {
                 Height = 1.0f,
                 MaxClimb = 0.25f,
