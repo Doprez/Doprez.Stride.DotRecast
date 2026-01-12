@@ -23,9 +23,9 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
 
         foreach (var otherEntity in component.Entity.Scene.Entities)
         {
-            TryAddDataToComponent(otherEntity, component);
+            if(TryAddDataToComponent(otherEntity, component))
+                component.PendingRebuild = true;
         }
-
         SettingsAdded?.Invoke(component);
     }
 
@@ -43,7 +43,13 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
             {
                 foreach(var component in ComponentDatas.Keys)
                 {
-                    TryAddDataToComponent(entity, component);
+                    if (TryAddDataToComponent(entity, component))
+                    {
+                        if (component.EnableDynamicNavigationMesh)
+                        {
+                            component.PendingRebuild = true;
+                        }
+                    }
                 }
             }
         }
@@ -54,14 +60,21 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
             {
                 foreach(var component in ComponentDatas.Keys)
                 {
-                    RemoveCollider(entity, component);
+                    if (TryRemoveCollider(entity, component))
+                    {
+                        if (component.EnableDynamicNavigationMesh)
+                        {
+                            component.PendingRebuild = true;
+                        }
+                    }
                 }
             }
         }
     }
 
-    private void TryAddDataToComponent(Entity entity, DotRecastNavigationMeshComponent component)
+    private bool TryAddDataToComponent(Entity entity, DotRecastNavigationMeshComponent component)
     {
+        bool componentAdded = false;
         foreach (var provider in component.GeometryProviders)
         {
             if(provider.TryGetComponent(entity, out var componentReference))
@@ -74,12 +87,16 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
                 _staticColliderDatas[componentReference] = data;
 
                 component.MeshBuilder.Add(data);
+                componentAdded = true;
             }
         }
+
+        return componentAdded;
     }
 
-    private void RemoveCollider(Entity entity, DotRecastNavigationMeshComponent component)
+    private bool TryRemoveCollider(Entity entity, DotRecastNavigationMeshComponent component)
     {
+        bool componentRemoved = false;
         foreach (var provider in component.GeometryProviders)
         {
             if (provider.TryGetComponent(entity, out var componentReference))
@@ -88,8 +105,10 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
                 {
                     component.MeshBuilder.Remove(data);
                     _staticColliderDatas.Remove(componentReference);
+                    componentRemoved = true;
                 }
             }
         }
+        return componentRemoved;
     }
 }

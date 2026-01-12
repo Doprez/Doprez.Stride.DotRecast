@@ -411,8 +411,8 @@ namespace Doprez.Stride.DotRecast.Navigation
                         // In this case, we don't need to recalculate the geometry for this shape, since it wasn't changed
                         // here we take the triangle mesh from the previous build as the current
                         colliderData.InputBuilder = colliderData.Previous.InputBuilder;
-                        colliderData.Processed = false;
-                        return;
+                        colliderData.Processed = true;
+                        continue;
                     }
                 }
 

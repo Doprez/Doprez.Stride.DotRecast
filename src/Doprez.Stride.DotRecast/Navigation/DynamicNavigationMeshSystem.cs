@@ -16,13 +16,22 @@ namespace Doprez.Stride.DotRecast.Navigation
     /// </summary>
     public class DynamicNavigationMeshSystem : GameSystem
     {
+
+        /// <summary>
+        /// Raised when the navigation mesh for the current scene is updated
+        /// </summary>
+        public event EventHandler<NavigationMeshUpdatedEventArgs> NavigationMeshUpdated;
+
+        /// <summary>
+        /// The most recently built navigation mesh
+        /// </summary>
+        public DotRecastNavigationMesh CurrentNavigationMesh { get; private set; }
+
         /// <summary>
         /// If <c>true</c>, this will automatically rebuild on addition/removal of static collider components
         /// </summary>
         [DataMember(5)]
         public bool AutomaticRebuild { get; set; } = true;
-
-        private bool _pendingRebuild = true;
 
         private SceneInstance _currentSceneInstance;
 
@@ -39,16 +48,6 @@ namespace Doprez.Stride.DotRecast.Navigation
             Enabled = true;
             EnabledChanged += OnEnabledChanged;
         }
-
-        /// <summary>
-        /// Raised when the navigation mesh for the current scene is updated
-        /// </summary>
-        public event EventHandler<NavigationMeshUpdatedEventArgs> NavigationMeshUpdated;
-
-        /// <summary>
-        /// The most recently built navigation mesh
-        /// </summary>
-        public DotRecastNavigationMesh CurrentNavigationMesh { get; private set; }
 
         /// <inheritdoc />
         public override void Initialize()
@@ -71,11 +70,11 @@ namespace Doprez.Stride.DotRecast.Navigation
                 UpdateScene(_sceneSystem.SceneInstance);
             }
 
-            if (_pendingRebuild && _currentSceneInstance != null)
+            if (_currentSceneInstance != null)
             {
                 foreach (var navMeshComponent in _navigationMeshComponents)
                 {
-                    if (navMeshComponent.EnableDynamicNavigationMesh)
+                    if (navMeshComponent.PendingRebuild)
                     {
                         _scriptSystem.AddTask(async () =>
                         {
@@ -87,8 +86,9 @@ namespace Doprez.Stride.DotRecast.Navigation
                             await Rebuild(navMeshComponent);
                         });
                     }
+
+                    navMeshComponent.PendingRebuild = false;
                 }
-                _pendingRebuild = false;
             }
         }
 
@@ -171,27 +171,17 @@ namespace Doprez.Stride.DotRecast.Navigation
                 _processor.SettingsAdded += ProcessorOnColliderAdded;
                 _processor.SettingsRemoved += ProcessorOnColliderRemoved;
                 _currentSceneInstance.Processors.Add(_processor);
-
-                _pendingRebuild = true;
             }
         }
 
         private void ProcessorOnColliderAdded(DotRecastNavigationMeshComponent component)
         {
             _navigationMeshComponents.Add(component);
-            if (AutomaticRebuild)
-            {
-                _pendingRebuild = true;
-            }
         }
 
         private void ProcessorOnColliderRemoved(DotRecastNavigationMeshComponent component)
         {
             _navigationMeshComponents.Remove(component);
-            if (AutomaticRebuild)
-            {
-                _pendingRebuild = true;
-            }
         }
 
         private void Cleanup()
@@ -207,10 +197,6 @@ namespace Doprez.Stride.DotRecast.Navigation
             if (!Enabled)
             {
                 Cleanup();
-            }
-            else
-            {
-                _pendingRebuild = true;
             }
         }
     }

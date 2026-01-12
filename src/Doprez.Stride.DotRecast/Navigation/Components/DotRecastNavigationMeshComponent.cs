@@ -57,4 +57,10 @@ public class DotRecastNavigationMeshComponent : EntityComponent
     /// The geometry providers used to gather collider geometry for navmesh generation
     /// </summary>
     public List<BaseGeometryProvider> GeometryProviders = [];
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a rebuild operation is pending.
+    /// </summary>
+    public bool PendingRebuild { get; set; }
+
 }
