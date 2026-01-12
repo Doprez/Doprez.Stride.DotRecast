@@ -14,7 +14,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         public EntityComponent Component;
         internal int ParameterHash = 0;
         internal bool Processed = false;
-        internal GeometryData InputBuilder;
+        internal GeometryData Geometry;
         internal DotRecastNavigationMeshCachedObject Previous;
     }
 }

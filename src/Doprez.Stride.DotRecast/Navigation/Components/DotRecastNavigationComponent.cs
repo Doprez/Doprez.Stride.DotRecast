@@ -14,9 +14,9 @@ namespace Doprez.Stride.DotRecast.Navigation.Components
     /// </summary>
     [DataContract(nameof(DotRecastNavigationComponent))]
     [Display("Navigation", Expand = ExpandRule.Once)]
-    [ComponentOrder(20000)]
+    [ComponentOrder(20005)]
     [DefaultEntityComponentProcessor(typeof(NavigationProcessor), ExecutionMode = ExecutionMode.Runtime)]
-    [ComponentCategory("Navigation")]
+    [ComponentCategory("DotRecast")]
     public class DotRecastNavigationComponent : EntityComponent
     {
         [DataMemberIgnore]

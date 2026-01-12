@@ -147,8 +147,8 @@ namespace Doprez.Stride.DotRecast.Navigation
                     continue;
 
                 // Otherwise, skip building these tiles
-                sceneNavigationMeshInputBuilder.AppendOther(colliderData.InputBuilder);
-                newCache.Add(colliderData.Component, colliderData.InputBuilder, colliderData.ParameterHash);
+                sceneNavigationMeshInputBuilder.AppendOther(colliderData.Geometry);
+                newCache.Add(colliderData.Component, colliderData.Geometry, colliderData.ParameterHash);
             }
 
             // TODO: Generate tile local mesh input data
@@ -174,14 +174,14 @@ namespace Doprez.Stride.DotRecast.Navigation
 
                     foreach (var colliderData in collidersLocal)
                     {
-                        if (colliderData.InputBuilder == null)
+                        if (colliderData.Geometry == null)
                             continue;
 
                         if (colliderData.Processed)
                         {
-                            MarkTiles(colliderData.InputBuilder, ref buildSettings, ref currentAgentSettings, tilesToBuild);
+                            MarkTiles(colliderData.Geometry, ref buildSettings, ref currentAgentSettings, tilesToBuild);
                             if (colliderData.Previous != null)
-                                MarkTiles(colliderData.Previous.InputBuilder, ref buildSettings, ref currentAgentSettings, tilesToBuild);
+                                MarkTiles(colliderData.Previous.Geometry, ref buildSettings, ref currentAgentSettings, tilesToBuild);
                         }
                     }
 
@@ -192,7 +192,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                         {
                             if (!newCache.Objects.ContainsKey(obj.Key))
                             {
-                                MarkTiles(obj.Value.InputBuilder, ref buildSettings, ref currentAgentSettings, tilesToBuild);
+                                MarkTiles(obj.Value.Geometry, ref buildSettings, ref currentAgentSettings, tilesToBuild);
                             }
                         }
                     }
@@ -399,7 +399,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             {
                 var entity = colliderData.Component.Entity;
 
-                GeometryData entityNavigationMeshInputBuilder = colliderData.InputBuilder = new();
+                GeometryData entityNavigationMeshInputBuilder = colliderData.Geometry = new();
 
                 // Compute hash of collider and compare it with the previous build if there is one
                 colliderData.ParameterHash = NavigationMeshBuildUtils.HashEntityComponent(colliderData.Component, includedCollisionGroups);
@@ -410,7 +410,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                     {
                         // In this case, we don't need to recalculate the geometry for this shape, since it wasn't changed
                         // here we take the triangle mesh from the previous build as the current
-                        colliderData.InputBuilder = colliderData.Previous.InputBuilder;
+                        colliderData.Geometry = colliderData.Previous.Geometry;
                         colliderData.Processed = true;
                         continue;
                     }

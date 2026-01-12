@@ -15,7 +15,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Components
     [DataContract]
     [DefaultEntityComponentProcessor(typeof(DotRecastBoundingBoxProcessor), ExecutionMode = ExecutionMode.Runtime)]
     [Display("DotRecast bounding box")]
-    [ComponentCategory("Navigation")]
+    [ComponentCategory("DotRecast")]
     public class DotRecastBoundingBoxComponent : EntityComponent
     {
         /// <summary>

@@ -2,7 +2,6 @@
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
 using Doprez.Stride.DotRecast.Geometry;
-using Doprez.Stride.DotRecast.Recast.Components;
 using Stride.Core;
 using Stride.Core.Mathematics;
 using Stride.Engine;
@@ -43,7 +42,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             {
                 Guid = collider.Id,
                 ParameterHash = entityColliderHash,
-                InputBuilder = data,
+                Geometry = data,
             });
         }
     }

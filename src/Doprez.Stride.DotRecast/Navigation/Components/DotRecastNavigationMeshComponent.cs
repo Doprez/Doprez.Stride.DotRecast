@@ -8,7 +8,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Components;
 
 [DataContract(nameof(DotRecastNavigationMeshComponent))]
 [ObjectFactory(typeof(DotRecastNavigationMeshComponentFactory))]
-[ComponentCategory("Navigation")]
+[ComponentCategory("DotRecast")]
 public class DotRecastNavigationMeshComponent : EntityComponent
 {
     /// <summary>
@@ -18,7 +18,6 @@ public class DotRecastNavigationMeshComponent : EntityComponent
     /// Enable dynamic navigation on navigation component.
     /// </userdoc>
     [DataMember(0)]
-    [Display("Enabled", "Dynamic navigation mesh")]
     public bool EnableDynamicNavigationMesh { get; set; }
 
     /// <summary>
@@ -28,7 +27,6 @@ public class DotRecastNavigationMeshComponent : EntityComponent
     /// Set which collision groups dynamically-generated navigation meshes use
     /// </userdoc>
     [DataMember(10)]
-    [Display(category: "Dynamic navigation mesh")]
     public NavMeshLayerGroup IncludedCollisionGroups { get; set; } = NavMeshLayerGroup.All;
 
     /// <summary>
@@ -38,7 +36,6 @@ public class DotRecastNavigationMeshComponent : EntityComponent
     /// Advanced settings for dynamically-generated navigation meshes
     /// </userdoc>
     [DataMember(20)]
-    [Display(category: "Dynamic navigation mesh")]
     public DotRecastNavigationMeshBuildSettings BuildSettings { get; set; }
 
     /// <summary>

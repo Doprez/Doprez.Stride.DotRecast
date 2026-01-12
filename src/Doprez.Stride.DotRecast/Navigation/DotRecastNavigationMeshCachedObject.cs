@@ -26,6 +26,6 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// Cached vertex data
         /// </summary>
-        public GeometryData InputBuilder;
+        public GeometryData Geometry;
     }
 }
