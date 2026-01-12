@@ -1,10 +1,13 @@
 ﻿using Doprez.Stride.DotRecast.Geometry;
 using Stride.Core;
+using Stride.Core.Annotations;
+using Stride.Core.Reflection;
 using Stride.Engine;
 
 namespace Doprez.Stride.DotRecast.Navigation.Components;
 
 [DataContract(nameof(DotRecastNavigationMeshComponent))]
+[ObjectFactory(typeof(DotRecastNavigationMeshComponentFactory))]
 [ComponentCategory("Navigation")]
 public class DotRecastNavigationMeshComponent : EntityComponent
 {
@@ -48,19 +51,38 @@ public class DotRecastNavigationMeshComponent : EntityComponent
     public List<DotRecastNavigationMeshGroup> Groups = [];
 
     /// <summary>
+    /// The geometry providers used to gather collider geometry for navmesh generation
+    /// </summary>
+    /// <userdoc>
+    /// The geometry providers used to gather collider geometry for navmesh generation
+    /// </userdoc>
+    public List<BaseGeometryProvider> GeometryProviders = [];
+
+    /// <summary>
     /// Used to build the navigation mesh at runtime. Gets set by the processor when the component is added to an entity.
     /// </summary>
     [DataMemberIgnore]
     public NavigationMeshBuilder MeshBuilder = null!;
 
     /// <summary>
-    /// The geometry providers used to gather collider geometry for navmesh generation
-    /// </summary>
-    public List<BaseGeometryProvider> GeometryProviders = [];
-
-    /// <summary>
     /// Gets or sets a value indicating whether a rebuild operation is pending.
     /// </summary>
+    [DataMemberIgnore]
     public bool PendingRebuild { get; set; }
 
+}
+
+public class DotRecastNavigationMeshComponentFactory : IObjectFactory
+{
+    public object New(Type type)
+    {
+        // Initialize build settings
+        return new DotRecastNavigationMeshComponent
+        {
+            EnableDynamicNavigationMesh = false,
+            BuildSettings = ObjectFactoryRegistry.NewInstance<DotRecastNavigationMeshBuildSettings>(),
+            IncludedCollisionGroups = NavMeshLayerGroup.All,
+            Groups = [ObjectFactoryRegistry.NewInstance<DotRecastNavigationMeshGroup>()],
+        };
+    }
 }
