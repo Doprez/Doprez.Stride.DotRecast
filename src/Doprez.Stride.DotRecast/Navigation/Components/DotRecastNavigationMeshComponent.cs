@@ -47,6 +47,9 @@ public class DotRecastNavigationMeshComponent : EntityComponent
     [DataMember(30)]
     public List<DotRecastNavigationMeshGroup> Groups = [];
 
+    /// <summary>
+    /// Used to build the navigation mesh at runtime. Gets set by the processor when the component is added to an entity.
+    /// </summary>
     [DataMemberIgnore]
     public NavigationMeshBuilder MeshBuilder = null!;
 

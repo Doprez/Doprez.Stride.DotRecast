@@ -1,5 +1,4 @@
-﻿
-using Doprez.Stride.DotRecast.Navigation;
+﻿using Doprez.Stride.DotRecast.Navigation;
 using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Extensions;

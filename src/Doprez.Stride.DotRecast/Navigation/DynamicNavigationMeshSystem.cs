@@ -73,15 +73,21 @@ namespace Doprez.Stride.DotRecast.Navigation
 
             if (pendingRebuild && currentSceneInstance != null)
             {
-                scriptSystem.AddTask(async () =>
+                foreach (var navMeshComponent in _navigationMeshComponents)
                 {
-                    // TODO EntityProcessors
-                    // Currently have to wait a frame for transformations to update
-                    // for example when calling Rebuild from the event that a component was added to the scene, this component will not be in the correct location yet
-                    // since the TransformProcessor runs the next frame
-                    await scriptSystem.NextFrame();
-                    await Rebuild();
-                });
+                    if (navMeshComponent.EnableDynamicNavigationMesh)
+                    {
+                        scriptSystem.AddTask(async () =>
+                        {
+                            // TODO EntityProcessors
+                            // Currently have to wait a frame for transformations to update
+                            // for example when calling Rebuild from the event that a component was added to the scene, this component will not be in the correct location yet
+                            // since the TransformProcessor runs the next frame
+                            await scriptSystem.NextFrame();
+                            await Rebuild(navMeshComponent);
+                        });
+                    }
+                }
                 pendingRebuild = false;
             }
         }
@@ -89,7 +95,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// Starts an asynchronous rebuild of the navigation mesh
         /// </summary>
-        public async Task<NavigationMeshBuildResult> Rebuild()
+        public async Task<NavigationMeshBuildResult> Rebuild(DotRecastNavigationMeshComponent navMeshComponent)
         {
             if (currentSceneInstance == null)
                 return new NavigationMeshBuildResult();
@@ -110,33 +116,14 @@ namespace Doprez.Stride.DotRecast.Navigation
                 boundingBoxes.Add(new BoundingBox(translation - boundingBox.Size * scale, translation + boundingBox.Size * scale));
             }
 
-            //foreach(var navMeshComponent in navigationMeshComponents)
-            //{
-            //    var buildSettings = navMeshComponent.BuildSettings;
-
-            //    var result = Task.Run(() =>
-            //    {
-            //        // Only have one active build at a time
-            //        lock (navMeshComponent.MeshBuilder)
-            //        {
-            //            return navMeshComponent.MeshBuilder.Build(buildSettings, navMeshComponent.Groups, navMeshComponent.IncludedCollisionGroups, boundingBoxes, buildTaskCancellationTokenSource.Token);
-            //        }
-            //    });
-
-            //    await result;
-
-            //    FinalizeRebuild(result);
-
-            //    return result.Result;
-            //}
-            var buildSettings = _navigationMeshComponents[0].BuildSettings;
+            var buildSettings = navMeshComponent.BuildSettings;
 
             var result = Task.Run(() =>
             {
                 // Only have one active build at a time
-                lock (_navigationMeshComponents[0].MeshBuilder)
+                lock (navMeshComponent.MeshBuilder)
                 {
-                    return _navigationMeshComponents[0].MeshBuilder.Build(buildSettings, _navigationMeshComponents[0].Groups, _navigationMeshComponents[0].IncludedCollisionGroups, boundingBoxes, buildTaskCancellationTokenSource.Token);
+                    return navMeshComponent.MeshBuilder.Build(buildSettings, navMeshComponent.Groups, navMeshComponent.IncludedCollisionGroups, boundingBoxes, buildTaskCancellationTokenSource.Token);
                 }
             });
 

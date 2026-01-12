@@ -36,7 +36,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <param name="collider">The collider that was processed</param>
         /// <param name="data">The collider vertex data that is generated for this entity</param>
         /// <param name="planes">Collection of infinite planes for this colliders, these are special since their size is not known until the bounding box are known</param>
-        /// <param name="entityColliderHash">The hash of the entity and collider obtained with <see cref="NavigationMeshBuildUtils.HashEntityCollider"/></param>
+        /// <param name="entityColliderHash">The hash of the entity and collider obtained with <see cref="NavigationMeshBuildUtils.HashEntityComponent"/></param>
         public void Add(EntityComponent collider, GeometryData data, int entityColliderHash)
         {
             Objects.Add(collider.Id, new DotRecastNavigationMeshCachedObject()

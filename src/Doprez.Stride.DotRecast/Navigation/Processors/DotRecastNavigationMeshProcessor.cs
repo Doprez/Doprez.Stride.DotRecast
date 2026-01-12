@@ -12,12 +12,14 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     public event CollectionChangedEventHandler? SettingsAdded;
     public event CollectionChangedEventHandler? SettingsRemoved;
 
+    private readonly Dictionary<EntityComponent, StaticColliderData> _staticColliderDatas = [];
+
     /// <inheritdoc />
     protected override void OnEntityComponentAdding(Entity entity, DotRecastNavigationMeshComponent component, DotRecastNavigationMeshComponent data)
     {
         component.MeshBuilder = new(Services, [.. component.GeometryProviders]);
 
-        component.Entity.Scene.Entities.CollectionChanged += AddCollider;
+        component.Entity.Scene.Entities.CollectionChanged += CollectionChanged;
 
         foreach (var otherEntity in component.Entity.Scene.Entities)
         {
@@ -33,7 +35,7 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
         SettingsRemoved?.Invoke(component);
     }
 
-    private void AddCollider(object? sender, TrackingCollectionChangedEventArgs e)
+    private void CollectionChanged(object? sender, TrackingCollectionChangedEventArgs e)
     {
         if(e.Action == NotifyCollectionChangedAction.Add)
         {
@@ -42,6 +44,17 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
                 foreach(var component in ComponentDatas.Keys)
                 {
                     TryAddDataToComponent(entity, component);
+                }
+            }
+        }
+
+        if(e.Action == NotifyCollectionChangedAction.Remove)
+        {
+            if(e.Item is Entity entity)
+            {
+                foreach(var component in ComponentDatas.Keys)
+                {
+                    RemoveCollider(entity, component);
                 }
             }
         }
@@ -58,8 +71,24 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
                     Component = componentReference,
                 };
 
+                _staticColliderDatas[componentReference] = data;
+
                 component.MeshBuilder.Add(data);
-                break;
+            }
+        }
+    }
+
+    private void RemoveCollider(Entity entity, DotRecastNavigationMeshComponent component)
+    {
+        foreach (var provider in component.GeometryProviders)
+        {
+            if (provider.TryGetComponent(entity, out var componentReference))
+            {
+                if (_staticColliderDatas.TryGetValue(componentReference, out var data))
+                {
+                    component.MeshBuilder.Remove(data);
+                    _staticColliderDatas.Remove(componentReference);
+                }
             }
         }
     }

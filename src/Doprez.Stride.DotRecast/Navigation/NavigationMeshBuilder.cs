@@ -7,7 +7,6 @@ using Stride.Core.Diagnostics;
 using Stride.Core.Extensions;
 using Stride.Core.Mathematics;
 using Stride.Core.Threading;
-using Stride.Graphics;
 
 namespace Doprez.Stride.DotRecast.Navigation
 {
@@ -20,16 +19,15 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// The logger to send additional information to
         /// </summary>
-        public Logger Logger;
+        public Logger Logger = GlobalLogger.GetLogger(nameof(NavigationMeshBuilder));
 
-        private DotRecastNavigationMesh oldNavigationMesh;
+        private DotRecastNavigationMesh _oldNavigationMesh;
 
-        private readonly List<StaticColliderData> colliders = [];
-        private readonly HashSet<Guid> registeredGuids = [];
+        private readonly List<StaticColliderData> _colliders = [];
+        private readonly HashSet<Guid> _registeredGuids = [];
+        private readonly BaseGeometryProvider[] _geometryProviders = [];
 
         private readonly IServiceRegistry _services;
-
-        private readonly BaseGeometryProvider[] _geometryProviders = [];
 
         /// <summary>
         /// Initializes the builder, optionally with a previous navigation mesh when building incrementally
@@ -37,7 +35,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <param name="oldNavigationMesh">The previous navigation mesh, to allow incremental builds</param>
         public NavigationMeshBuilder(IServiceRegistry services, BaseGeometryProvider[] geometryProviders, DotRecastNavigationMesh oldNavigationMesh = null)
         {
-            this.oldNavigationMesh = oldNavigationMesh;
+            _oldNavigationMesh = oldNavigationMesh;
             _services = services;
             _geometryProviders = geometryProviders;
         }
@@ -52,12 +50,12 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <param name="colliderData">A collider data object to add</param>
         public void Add(StaticColliderData colliderData)
         {
-            lock (colliders)
+            lock (_colliders)
             {
-                if (registeredGuids.Contains(colliderData.Component.Id))
+                if (_registeredGuids.Contains(colliderData.Component.Id))
                     throw new InvalidOperationException("Duplicate collider added");
-                colliders.Add(colliderData);
-                registeredGuids.Add(colliderData.Component.Id);
+                _colliders.Add(colliderData);
+                _registeredGuids.Add(colliderData.Component.Id);
             }
         }
 
@@ -67,12 +65,12 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <param name="colliderData">The collider data object to remove</param>
         public void Remove(StaticColliderData colliderData)
         {
-            lock (colliders)
+            lock (_colliders)
             {
-                if (!registeredGuids.Contains(colliderData.Component.Id))
+                if (!_registeredGuids.Contains(colliderData.Component.Id))
                     throw new InvalidOperationException("Trying to remove unregistered collider");
-                colliders.Remove(colliderData);
-                registeredGuids.Remove(colliderData.Component.Id);
+                _colliders.Remove(colliderData);
+                _registeredGuids.Remove(colliderData.Component.Id);
             }
         }
 
@@ -88,40 +86,40 @@ namespace Doprez.Stride.DotRecast.Navigation
         public NavigationMeshBuildResult  Build(DotRecastNavigationMeshBuildSettings buildSettings, ICollection<DotRecastNavigationMeshGroup> groups, NavMeshLayerGroup includedCollisionGroups,
             ICollection<BoundingBox> boundingBoxes, CancellationToken cancellationToken)
         {
-            var lastCache = oldNavigationMesh?.Cache;
+            var lastCache = _oldNavigationMesh?.Cache;
             var result = new NavigationMeshBuildResult();
 
             if (groups.Count == 0)
             {
-                Logger?.Warning("No group settings found");
+                Logger.Warning("No group settings found");
                 result.Success = true;
                 result.NavigationMesh = new DotRecastNavigationMesh();
                 return result;
             }
 
             if (boundingBoxes.Count == 0)
-                Logger?.Warning("No bounding boxes found");
+                Logger.Warning("No bounding boxes found");
 
             var settingsHash = groups?.ComputeHash() ?? 0;
             settingsHash = (settingsHash * 397) ^ buildSettings.GetHashCode();
             if (lastCache != null && lastCache.SettingsHash != settingsHash)
             {
                 // Start from scratch if settings changed
-                oldNavigationMesh = null;
-                Logger?.Info("Build settings changed, doing a full rebuild");
+                _oldNavigationMesh = null;
+                Logger.Info("Build settings changed, doing a full rebuild");
             }
 
             // Copy colliders so the collection doesn't get modified
             StaticColliderData[] collidersLocal;
-            lock (colliders)
+            lock (_colliders)
             {
-                collidersLocal = [.. colliders];
+                collidersLocal = [.. _colliders];
             }
 
             BuildInput(collidersLocal, includedCollisionGroups);
 
             // Check if cache was cleared while building the input
-            lastCache = oldNavigationMesh?.Cache;
+            lastCache = _oldNavigationMesh?.Cache;
 
             // The new navigation mesh that will be created
             result.NavigationMesh = new DotRecastNavigationMesh
@@ -245,7 +243,7 @@ namespace Doprez.Stride.DotRecast.Navigation
 
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        Logger?.Warning("Operation cancelled");
+                        Logger.Warning("Operation cancelled");
                         return result;
                     }
 
@@ -254,7 +252,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                     result.NavigationMesh.LayersInternal.Add(currentGroup.Id, layer);
 
                     // Copy tiles from the previous build into the current
-                    if (oldNavigationMesh != null && oldNavigationMesh.LayersInternal.TryGetValue(currentGroup.Id, out var sourceLayer))
+                    if (_oldNavigationMesh != null && _oldNavigationMesh.LayersInternal.TryGetValue(currentGroup.Id, out var sourceLayer))
                     {
                         foreach (var sourceTile in sourceLayer.Tiles)
                             layer.TilesInternal.Add(sourceTile.Key, sourceTile.Value);
@@ -280,7 +278,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                         var layerUpdateInfo = new NavigationMeshLayerUpdateInfo
                         {
                             GroupId = currentGroup.Id,
-                            UpdatedTiles = tilesToBuild.ToList()
+                            UpdatedTiles = [.. tilesToBuild]
                         };
                         result.UpdatedLayers.Add(layerUpdateInfo);
                     }
@@ -288,10 +286,10 @@ namespace Doprez.Stride.DotRecast.Navigation
             }
 
             // Check for removed layers
-            if (oldNavigationMesh != null)
+            if (_oldNavigationMesh != null)
             {
                 var newGroups = groups.ToLookup(x => x.Id);
-                foreach (var oldLayer in oldNavigationMesh.Layers)
+                foreach (var oldLayer in _oldNavigationMesh.Layers)
                 {
                     if (!newGroups.Contains(oldLayer.Key))
                     {
@@ -309,16 +307,16 @@ namespace Doprez.Stride.DotRecast.Navigation
             }
 
             // Store bounding boxes in new tile cache
-            newCache.BoundingBoxes = new List<BoundingBox>(boundingBoxes);
+            newCache.BoundingBoxes = [.. boundingBoxes];
 
             // Update navigation mesh
-            oldNavigationMesh = result.NavigationMesh;
+            _oldNavigationMesh = result.NavigationMesh;
 
             result.Success = true;
             return result;
         }
 
-        private DotRecastNavigationMeshTile BuildTile(Point tileCoordinate, DotRecastNavigationMeshBuildSettings buildSettings, DotRecastNavigationAgentSettings agentSettings,
+        private static DotRecastNavigationMeshTile BuildTile(Point tileCoordinate, DotRecastNavigationMeshBuildSettings buildSettings, DotRecastNavigationAgentSettings agentSettings,
             ICollection<BoundingBox> boundingBoxes, Vector3[] inputVertices, int[] inputIndices)
         {
             DotRecastNavigationMeshTile meshTile = null;
@@ -348,7 +346,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                 tileBoundingBox.Maximum.Y = maximumHeight;
 
                 // Turn build settings into native structure format
-                BuildSettings internalBuildSettings = new BuildSettings
+                BuildSettings internalBuildSettings = new()
                 {
                     // Tile settings
                     BoundingBox = tileBoundingBox,
@@ -393,7 +391,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// </summary>
         private void BuildInput(StaticColliderData[] collidersLocal, NavMeshLayerGroup includedCollisionGroups)
         {
-            DotRecastNavigationMeshCache lastCache = oldNavigationMesh?.Cache;
+            DotRecastNavigationMeshCache? lastCache = _oldNavigationMesh?.Cache;
             
             bool clearCache = false;
 
@@ -404,7 +402,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                 GeometryData entityNavigationMeshInputBuilder = colliderData.InputBuilder = new();
 
                 // Compute hash of collider and compare it with the previous build if there is one
-                colliderData.ParameterHash = NavigationMeshBuildUtils.HashEntityCollider(colliderData.Component, includedCollisionGroups);
+                colliderData.ParameterHash = NavigationMeshBuildUtils.HashEntityComponent(colliderData.Component, includedCollisionGroups);
                 colliderData.Previous = null;
                 if (lastCache?.Objects.TryGetValue(colliderData.Component.Id, out colliderData.Previous) ?? false)
                 {
@@ -428,16 +426,16 @@ namespace Doprez.Stride.DotRecast.Navigation
                 }
             }
 
-            if (clearCache && oldNavigationMesh != null)
+            if (clearCache && _oldNavigationMesh != null)
             {
-                oldNavigationMesh = null;
+                _oldNavigationMesh = null;
             }
         }
 
         /// <summary>
         /// Marks tiles that should be built according to how much their geometry affects the navigation mesh and the bounding boxes specified for building
         /// </summary>
-        private void MarkTiles(GeometryData inputBuilder, ref DotRecastNavigationMeshBuildSettings buildSettings, ref DotRecastNavigationAgentSettings agentSettings, HashSet<Point> tilesToBuild)
+        private static void MarkTiles(GeometryData inputBuilder, ref DotRecastNavigationMeshBuildSettings buildSettings, ref DotRecastNavigationAgentSettings agentSettings, HashSet<Point> tilesToBuild)
         {
             // Extend bounding box for agent size
             BoundingBox boundingBoxToCheck = inputBuilder.BoundingBox;
@@ -448,35 +446,6 @@ namespace Doprez.Stride.DotRecast.Navigation
             {
                 tilesToBuild.Add(p);
             }
-        }
-
-        /// <summary>
-        /// Generates triangles for an infinite plane that will completely intersect the given bounding box
-        /// </summary>
-        private DotRecastNavigationMeshInputBuilder BuildPlaneGeometry(Plane plane, BoundingBox boundingBox)
-        {
-            Vector3 maxSize = boundingBox.Maximum - boundingBox.Minimum;
-            float maxDiagonal = Math.Max(maxSize.X, Math.Max(maxSize.Y, maxSize.Z));
-
-            // Generate source plane triangles
-            NavigationMeshBuildUtils.BuildPlanePoints(ref plane, maxDiagonal, out var planePoints, out var planeInds);
-
-            NavigationMeshBuildUtils.GenerateTangentBinormal(plane.Normal, out var tangent, out var bitangent);
-            // Calculate plane offset so that the plane always covers the whole range of the bounding box
-            Vector3 planeOffset = Vector3.Dot(boundingBox.Center, tangent) * tangent;
-            planeOffset += Vector3.Dot(boundingBox.Center, bitangent) * bitangent;
-
-            VertexPositionNormalTexture[] vertices = new VertexPositionNormalTexture[planePoints.Length];
-            for (int i = 0; i < planePoints.Length; i++)
-            {
-                vertices[i] = new VertexPositionNormalTexture(planePoints[i] + planeOffset, Vector3.UnitY, Vector2.Zero);
-            }
-
-            GeometricMeshData<VertexPositionNormalTexture> meshData = new GeometricMeshData<VertexPositionNormalTexture>(vertices, planeInds, true);
-
-            DotRecastNavigationMeshInputBuilder inputBuilder = new DotRecastNavigationMeshInputBuilder();
-            inputBuilder.AppendMeshData(meshData, Matrix.Identity);
-            return inputBuilder;
         }
     }
 }

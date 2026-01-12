@@ -19,7 +19,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         public Guid Guid;
 
         /// <summary>
-        /// Hash obtained with <see cref="NavigationMeshBuildUtils.HashEntityCollider"/>
+        /// Hash obtained with <see cref="NavigationMeshBuildUtils.HashEntityComponent"/>
         /// </summary>
         public int ParameterHash;
 
