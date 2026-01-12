@@ -21,7 +21,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// </summary>
         public Logger Logger = GlobalLogger.GetLogger(nameof(NavigationMeshBuilder));
 
-        private DotRecastNavigationMesh _oldNavigationMesh;
+        private DotRecastNavigationMesh? _oldNavigationMesh;
 
         private readonly List<StaticColliderData> _colliders = [];
         private readonly HashSet<Guid> _registeredGuids = [];
@@ -319,7 +319,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         private static DotRecastNavigationMeshTile BuildTile(Point tileCoordinate, DotRecastNavigationMeshBuildSettings buildSettings, DotRecastNavigationAgentSettings agentSettings,
             ICollection<BoundingBox> boundingBoxes, Vector3[] inputVertices, int[] inputIndices)
         {
-            DotRecastNavigationMeshTile meshTile = null;
+            DotRecastNavigationMeshTile? meshTile = null;
 
             // Include bounding boxes in tile height range
             BoundingBox tileBoundingBox = NavigationMeshBuildUtils.CalculateTileBoundingBox(buildSettings, tileCoordinate);

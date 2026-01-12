@@ -22,17 +22,17 @@ namespace Doprez.Stride.DotRecast.Navigation
         [DataMember(5)]
         public bool AutomaticRebuild { get; set; } = true;
 
-        private bool pendingRebuild = true;
+        private bool _pendingRebuild = true;
 
-        private SceneInstance currentSceneInstance;
+        private SceneInstance _currentSceneInstance;
 
-        private CancellationTokenSource buildTaskCancellationTokenSource;
+        private CancellationTokenSource _buildTaskCancellationTokenSource;
 
-        private SceneSystem sceneSystem;
-        private ScriptSystem scriptSystem;
-        private DotRecastNavigationMeshProcessor processor;
+        private SceneSystem _sceneSystem;
+        private ScriptSystem _scriptSystem;
+        private DotRecastNavigationMeshProcessor _processor;
 
-        private List<DotRecastNavigationMeshComponent> _navigationMeshComponents = [];
+        private readonly List<DotRecastNavigationMeshComponent> _navigationMeshComponents = [];
 
         public DynamicNavigationMeshSystem(IServiceRegistry registry) : base(registry)
         {
@@ -54,8 +54,8 @@ namespace Doprez.Stride.DotRecast.Navigation
         public override void Initialize()
         {
             base.Initialize();
-            sceneSystem = Services.GetSafeServiceAs<SceneSystem>();
-            scriptSystem = Services.GetSafeServiceAs<ScriptSystem>();
+            _sceneSystem = Services.GetSafeServiceAs<SceneSystem>();
+            _scriptSystem = Services.GetSafeServiceAs<ScriptSystem>();
         }
 
         /// <inheritdoc />
@@ -65,30 +65,30 @@ namespace Doprez.Stride.DotRecast.Navigation
             if (!Enabled)
                 return;
 
-            if (currentSceneInstance != sceneSystem?.SceneInstance)
+            if (_currentSceneInstance != _sceneSystem?.SceneInstance)
             {
                 // ReSharper disable once PossibleNullReferenceException
-                UpdateScene(sceneSystem.SceneInstance);
+                UpdateScene(_sceneSystem.SceneInstance);
             }
 
-            if (pendingRebuild && currentSceneInstance != null)
+            if (_pendingRebuild && _currentSceneInstance != null)
             {
                 foreach (var navMeshComponent in _navigationMeshComponents)
                 {
                     if (navMeshComponent.EnableDynamicNavigationMesh)
                     {
-                        scriptSystem.AddTask(async () =>
+                        _scriptSystem.AddTask(async () =>
                         {
                             // TODO EntityProcessors
                             // Currently have to wait a frame for transformations to update
                             // for example when calling Rebuild from the event that a component was added to the scene, this component will not be in the correct location yet
                             // since the TransformProcessor runs the next frame
-                            await scriptSystem.NextFrame();
+                            await _scriptSystem.NextFrame();
                             await Rebuild(navMeshComponent);
                         });
                     }
                 }
-                pendingRebuild = false;
+                _pendingRebuild = false;
             }
         }
 
@@ -97,15 +97,15 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// </summary>
         public async Task<NavigationMeshBuildResult> Rebuild(DotRecastNavigationMeshComponent navMeshComponent)
         {
-            if (currentSceneInstance == null)
+            if (_currentSceneInstance == null)
                 return new NavigationMeshBuildResult();
 
             // Cancel running build, TODO check if the running build can actual satisfy the current rebuild request and don't cancel in that case
-            buildTaskCancellationTokenSource?.Cancel();
-            buildTaskCancellationTokenSource = new CancellationTokenSource();
+            _buildTaskCancellationTokenSource?.Cancel();
+            _buildTaskCancellationTokenSource = new CancellationTokenSource();
 
             // Collect bounding boxes
-            var boundingBoxProcessor = currentSceneInstance.GetProcessor<DotRecastBoundingBoxProcessor>();
+            var boundingBoxProcessor = _currentSceneInstance.GetProcessor<DotRecastBoundingBoxProcessor>();
             if (boundingBoxProcessor == null)
                 return new NavigationMeshBuildResult();
 
@@ -123,7 +123,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                 // Only have one active build at a time
                 lock (navMeshComponent.MeshBuilder)
                 {
-                    return navMeshComponent.MeshBuilder.Build(buildSettings, navMeshComponent.Groups, navMeshComponent.IncludedCollisionGroups, boundingBoxes, buildTaskCancellationTokenSource.Token);
+                    return navMeshComponent.MeshBuilder.Build(buildSettings, navMeshComponent.Groups, navMeshComponent.IncludedCollisionGroups, boundingBoxes, _buildTaskCancellationTokenSource.Token);
                 }
             });
 
@@ -151,28 +151,28 @@ namespace Doprez.Stride.DotRecast.Navigation
 
         private void UpdateScene(SceneInstance newSceneInstance)
         {
-            if (currentSceneInstance != null)
+            if (_currentSceneInstance != null)
             {
-                if (processor != null)
+                if (_processor != null)
                 {
-                    currentSceneInstance.Processors.Remove(processor);
-                    processor.SettingsAdded -= ProcessorOnColliderAdded;
-                    processor.SettingsRemoved -= ProcessorOnColliderRemoved;
+                    _currentSceneInstance.Processors.Remove(_processor);
+                    _processor.SettingsAdded -= ProcessorOnColliderAdded;
+                    _processor.SettingsRemoved -= ProcessorOnColliderRemoved;
                 }
             }
 
             // Set the correct scene
-            currentSceneInstance = newSceneInstance;
+            _currentSceneInstance = newSceneInstance;
 
-            if (currentSceneInstance != null)
+            if (_currentSceneInstance != null)
             {
                 // Scan for components
-                processor = new();
-                processor.SettingsAdded += ProcessorOnColliderAdded;
-                processor.SettingsRemoved += ProcessorOnColliderRemoved;
-                currentSceneInstance.Processors.Add(processor);
+                _processor = new();
+                _processor.SettingsAdded += ProcessorOnColliderAdded;
+                _processor.SettingsRemoved += ProcessorOnColliderRemoved;
+                _currentSceneInstance.Processors.Add(_processor);
 
-                pendingRebuild = true;
+                _pendingRebuild = true;
             }
         }
 
@@ -181,7 +181,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             _navigationMeshComponents.Add(component);
             if (AutomaticRebuild)
             {
-                pendingRebuild = true;
+                _pendingRebuild = true;
             }
         }
 
@@ -190,7 +190,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             _navigationMeshComponents.Remove(component);
             if (AutomaticRebuild)
             {
-                pendingRebuild = true;
+                _pendingRebuild = true;
             }
         }
 
@@ -210,7 +210,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             }
             else
             {
-                pendingRebuild = true;
+                _pendingRebuild = true;
             }
         }
     }
