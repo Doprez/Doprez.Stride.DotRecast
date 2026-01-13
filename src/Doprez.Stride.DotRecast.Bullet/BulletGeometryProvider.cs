@@ -58,7 +58,7 @@ public class BulletGeometryProvider : BaseGeometryProvider
     {
         var geometry = new GeometryData();
 
-        // Interate through all the colliders shapes while queueing all shapes in compound shapes to process those as well
+        // Iterate through all the colliders shapes while queueing all shapes in compound shapes to process those as well
         Queue<ColliderShape> shapesToProcess = new();
         shapesToProcess.Enqueue(colliderShape);
         while (shapesToProcess.Count > 0)
