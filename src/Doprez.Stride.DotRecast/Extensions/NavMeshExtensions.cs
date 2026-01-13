@@ -74,8 +74,8 @@ public static class NavMeshExtensions
 
                     MeshDraw draw;
                     using (var meshData = new GeometricMeshData<VertexPositionNormalTexture>(meshVertices.ToArray(), tileIndexList.ToArray(), true))
+                    using (var primitive = new GeometricPrimitive(game.GraphicsDevice, meshData))
                     {
-                        GeometricPrimitive primitive = new GeometricPrimitive(game.GraphicsDevice, meshData);
                         //ret.GeneratedDynamicPrimitives.Add(primitive);
                         draw = primitive.ToMeshDraw();
                     }
