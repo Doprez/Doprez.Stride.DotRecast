@@ -1,23 +1,13 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
+using Doprez.Stride.DotRecast.Extensions;
 using DotRecast.Core.Numerics;
 using DotRecast.Detour;
 using Stride.Core.Mathematics;
 
 namespace Doprez.Stride.DotRecast.Navigation;
 
-internal static class Vector3Extensions
-{
-    internal static RcVec3f ToDotRecastVector(this Vector3 v)
-    {
-        return new RcVec3f(v.X, v.Y, v.Z);
-    }
-    internal static Vector3 ToStrideVector(this RcVec3f v)
-    {
-        return new Vector3(v.X, v.Y, v.Z);
-    }
-}
 internal class InternalNavigationMesh
 {
     private readonly DtNavMesh navMesh;

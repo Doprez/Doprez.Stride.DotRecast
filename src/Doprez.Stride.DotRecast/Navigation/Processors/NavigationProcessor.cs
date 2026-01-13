@@ -16,7 +16,7 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
     /// </summary>
     public class NavigationProcessor : EntityProcessor<DotRecastNavigationComponent, NavigationProcessor.AssociatedData>
     {
-        private readonly Dictionary<DotRecastNavigationMesh, NavigationMeshData> loadedNavigationMeshes = new();
+        private readonly Dictionary<DotRecastNavigationMesh, NavigationMeshData> loadedNavigationMeshes = [];
         private DynamicNavigationMeshSystem dynamicNavigationMeshSystem;
         private GameSystemCollection gameSystemCollection;
 

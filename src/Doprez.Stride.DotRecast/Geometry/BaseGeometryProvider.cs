@@ -21,7 +21,7 @@ public abstract class BaseGeometryProvider
     public abstract bool TryGetTransformedShapeInfo(Entity entity, out GeometryData shapeData);
 
     /// <summary>
-    /// Gets the Id of the component that provides the geometry from the entity.
+    /// Tries to get the component that provides the geometry from the entity.
     /// </summary>
     /// <param name="entity"></param>
     /// <returns></returns>

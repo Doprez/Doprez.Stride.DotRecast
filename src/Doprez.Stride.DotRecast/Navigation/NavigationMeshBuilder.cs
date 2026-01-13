@@ -83,7 +83,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <param name="boundingBoxes">A collection of bounding boxes to use as the region for which to generate navigation mesh tiles</param>
         /// <param name="cancellationToken">A cancellation token to interrupt the build process</param>
         /// <returns>The build result</returns>
-        public NavigationMeshBuildResult  Build(DotRecastNavigationMeshBuildSettings buildSettings, ICollection<DotRecastNavigationMeshGroup> groups, NavMeshLayerGroup includedCollisionGroups,
+        public NavigationMeshBuildResult  Build(DotRecastNavigationMeshBuildSettings buildSettings, ICollection<DotRecastNavigationMeshGroup> groups,
             ICollection<BoundingBox> boundingBoxes, CancellationToken cancellationToken)
         {
             var lastCache = _oldNavigationMesh?.Cache;
@@ -116,7 +116,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                 collidersLocal = [.. _colliders];
             }
 
-            BuildInput(collidersLocal, includedCollisionGroups);
+            BuildInput(collidersLocal);
 
             // Check if cache was cleared while building the input
             lastCache = _oldNavigationMesh?.Cache;
@@ -389,7 +389,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// Rebuilds outdated triangle data for colliders and recalculates hashes storing everything in StaticColliderData
         /// </summary>
-        private void BuildInput(StaticColliderData[] collidersLocal, NavMeshLayerGroup includedCollisionGroups)
+        private void BuildInput(StaticColliderData[] collidersLocal)
         {
             DotRecastNavigationMeshCache? lastCache = _oldNavigationMesh?.Cache;
             
@@ -402,7 +402,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                 GeometryData entityNavigationMeshInputBuilder = colliderData.Geometry = new();
 
                 // Compute hash of collider and compare it with the previous build if there is one
-                colliderData.ParameterHash = NavigationMeshBuildUtils.HashEntityComponent(colliderData.Component, includedCollisionGroups);
+                colliderData.ParameterHash = NavigationMeshBuildUtils.HashEntityComponent(colliderData.Component);
                 colliderData.Previous = null;
                 if (lastCache?.Objects.TryGetValue(colliderData.Component.Id, out colliderData.Previous) ?? false)
                 {

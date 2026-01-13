@@ -21,15 +21,6 @@ public class DotRecastNavigationMeshComponent : EntityComponent
     public bool EnableDynamicNavigationMesh { get; set; }
 
     /// <summary>
-    /// Collision filter that indicates which colliders are used in navmesh generation
-    /// </summary>
-    /// <userdoc>
-    /// Set which collision groups dynamically-generated navigation meshes use
-    /// </userdoc>
-    [DataMember(10)]
-    public NavMeshLayerGroup IncludedCollisionGroups { get; set; } = NavMeshLayerGroup.All;
-
-    /// <summary>
     /// Build settings used by Recast
     /// </summary>
     /// <userdoc>
@@ -78,7 +69,6 @@ public class DotRecastNavigationMeshComponentFactory : IObjectFactory
         {
             EnableDynamicNavigationMesh = false,
             BuildSettings = ObjectFactoryRegistry.NewInstance<DotRecastNavigationMeshBuildSettings>(),
-            IncludedCollisionGroups = NavMeshLayerGroup.All,
             Groups = [ObjectFactoryRegistry.NewInstance<DotRecastNavigationMeshGroup>()],
         };
     }

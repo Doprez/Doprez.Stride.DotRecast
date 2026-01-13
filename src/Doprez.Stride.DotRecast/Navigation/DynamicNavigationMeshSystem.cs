@@ -25,7 +25,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// The most recently built navigation mesh
         /// </summary>
-        public DotRecastNavigationMesh CurrentNavigationMesh { get; private set; }
+        public DotRecastNavigationMesh? CurrentNavigationMesh { get; private set; }
 
         /// <summary>
         /// If <c>true</c>, this will automatically rebuild on addition/removal of static collider components
@@ -33,7 +33,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         [DataMember(5)]
         public bool AutomaticRebuild { get; set; } = true;
 
-        private SceneInstance _currentSceneInstance;
+        private SceneInstance? _currentSceneInstance;
 
         private CancellationTokenSource _buildTaskCancellationTokenSource;
 
@@ -123,7 +123,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                 // Only have one active build at a time
                 lock (navMeshComponent.MeshBuilder)
                 {
-                    return navMeshComponent.MeshBuilder.Build(buildSettings, navMeshComponent.Groups, navMeshComponent.IncludedCollisionGroups, boundingBoxes, _buildTaskCancellationTokenSource.Token);
+                    return navMeshComponent.MeshBuilder.Build(buildSettings, navMeshComponent.Groups, boundingBoxes, _buildTaskCancellationTokenSource.Token);
                 }
             });
 
@@ -149,7 +149,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             }
         }
 
-        private void UpdateScene(SceneInstance newSceneInstance)
+        private void UpdateScene(SceneInstance? newSceneInstance)
         {
             if (_currentSceneInstance != null)
             {
@@ -192,7 +192,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             NavigationMeshUpdated?.Invoke(this, null);
         }
 
-        private void OnEnabledChanged(object sender, EventArgs eventArgs)
+        private void OnEnabledChanged(object? sender, EventArgs? eventArgs)
         {
             if (!Enabled)
             {
@@ -203,7 +203,7 @@ namespace Doprez.Stride.DotRecast.Navigation
 
     public class NavigationMeshUpdatedEventArgs : EventArgs
     {
-        public DotRecastNavigationMesh OldNavigationMesh;
-        public NavigationMeshBuildResult BuildResult;
+        public DotRecastNavigationMesh? OldNavigationMesh;
+        public NavigationMeshBuildResult? BuildResult;
     }
 }

@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net) and Silicon Studio Corp. (https://www.siliconstudio.co.jp)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
+using Doprez.Stride.DotRecast.Extensions;
 using DotRecast.Detour;
 using Stride.Core.Mathematics;
 
@@ -72,8 +73,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <returns>The found path points or null</returns>
         public bool TryFindPath(Vector3 start, Vector3 end, ICollection<Vector3> path, NavigationQuerySettings querySettings)
         {
-            if (path == null)
-                throw new ArgumentNullException(nameof(path));
+            ArgumentNullException.ThrowIfNull(path);
             if (navmesh == null)
                 return false;
 

@@ -16,12 +16,13 @@ public class BulletGeometryProvider : BaseGeometryProvider
 
     private readonly Logger _logger = GlobalLogger.GetLogger(nameof(BulletGeometryProvider));
 
-    public override bool EntityHasValidGeometry(Entity entity)
+    public override bool TryGetComponent(Entity entity, out EntityComponent component)
     {
-        return entity.Get<StaticColliderComponent>() != null;
+        component = entity.Get<StaticColliderComponent>();
+        return component != null;
     }
 
-    public override bool TryGetTransformedShapeInfo(Entity entity, out GeometryData? shapeData)
+    public override bool TryGetTransformedShapeInfo(Entity entity, out GeometryData shapeData)
     {
         var collidable = entity.Get<StaticColliderComponent>();
 
@@ -29,30 +30,31 @@ public class BulletGeometryProvider : BaseGeometryProvider
         if (collidable is not StaticColliderComponent)
         {
             _logger.Info($"Entity {entity.Name} does not have a {nameof(StaticColliderComponent)}. Only StaticColliders are supported for navigation mesh generation.");
-            shapeData = null;
+            shapeData = new();
             return false;
         }
 
         if (!CollidersToInclude.HasFlag(collidable.CollisionGroup))
         {
             _logger.Info($"Entity {entity.Name} is not part of a valid collision layer.");
-            shapeData = null;
+            shapeData = new();
             return false;
         }
 
-        shapeData = GetBulletGeometry(collidable.ColliderShape, entity.Transform.WorldMatrix);
+        var data = GetBulletGeometry(collidable.ColliderShape, entity.Transform.WorldMatrix);
 
-        if (shapeData == null)
+        if (data == null)
         {
             _logger.Error($"Unsupported collider type for entity {collidable.Entity.Name}. Only CompoundCollider and MeshCollider are supported for navigation mesh generation.");
-            shapeData = null;
+            shapeData = new();
             return false;
         }
 
+        shapeData = data;
         return true;
     }
 
-    private GeometryData? GetBulletGeometry(ColliderShape colliderhape, Matrix worldTransform)
+    private static GeometryData? GetBulletGeometry(ColliderShape colliderhape, Matrix worldTransform)
     {
         var geometry = new GeometryData();
 
@@ -114,7 +116,7 @@ public class BulletGeometryProvider : BaseGeometryProvider
                 var planeDesc = GetColliderShapeDesc<StaticPlaneColliderShapeDesc>(planeShape.Description);
                 Matrix transform = worldTransform;
 
-                Plane plane = new Plane(planeDesc.Normal, planeDesc.Offset)
+                Plane plane = new(planeDesc.Normal, planeDesc.Offset)
                 {
                     // Pre-Transform plane parameters
                     Normal = Vector3.TransformNormal(planeDesc.Normal, transform)
@@ -219,7 +221,7 @@ public class BulletGeometryProvider : BaseGeometryProvider
     /// <summary>
     /// Extract the collider shape description in the case of it being either an inline shape or an asset as shape
     /// </summary>
-    private TColliderType GetColliderShapeDesc<TColliderType>(IColliderShapeDesc desc) where TColliderType : class, IColliderShapeDesc
+    private static TColliderType GetColliderShapeDesc<TColliderType>(IColliderShapeDesc desc) where TColliderType : class, IColliderShapeDesc
     {
         if (desc is TColliderType direct)
             return direct;

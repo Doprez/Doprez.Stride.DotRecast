@@ -29,6 +29,7 @@ public class BepuGeometryProvider : BaseGeometryProvider
     public override bool TryGetTransformedShapeInfo(Entity entity, out GeometryData shapeData)
     {
         var collidable = entity.Get<CollidableComponent>();
+        bool isNull = false;
 
         // Only use StaticColliders for the nav mesh build.
         if (collidable is not StaticComponent)
@@ -48,14 +49,16 @@ public class BepuGeometryProvider : BaseGeometryProvider
         if(collidable.Collider is CompoundCollider compoundCollider)
         {
             shapeData = GetCompoundGeometry(compoundCollider, collidable.Entity.Transform.WorldMatrix);
+            isNull = shapeData == null;
             shapeData ??= new();
-            return shapeData != null;
+            return isNull;
         }
         else if (collidable.Collider is MeshCollider meshCollider)
         {
             shapeData = GetMeshGeometry(meshCollider, collidable.Entity.Transform.WorldMatrix);
+            isNull = shapeData == null;
             shapeData ??= new();
-            return shapeData != null;
+            return isNull;
         }
 
         _logger.Error($"Problem getting info from collider type {collidable.Collider.GetType().Name} for entity {collidable.Entity.Name}.");

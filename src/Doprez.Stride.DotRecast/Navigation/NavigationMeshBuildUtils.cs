@@ -134,12 +134,11 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <param name="includedCollisionGroups">The filter group for active collides, 
         ///     which is used to hash if this colliders participates in the navigation mesh build</param>
         /// <returns></returns>
-        public static int HashEntityComponent(EntityComponent component, NavMeshLayerGroup includedCollisionGroups)
+        public static int HashEntityComponent(EntityComponent component)
         {
             int hash = 0;
             hash = (hash * 397) ^ component.Entity.Transform.WorldMatrix.GetHashCode();
             //hash = (hash * 397) ^ collider.Enabled.GetHashCode();
-            //hash = (hash * 397) ^ CheckColliderFilter(collider, includedCollisionGroups).GetHashCode();
             return hash;
         }
     }
