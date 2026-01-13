@@ -54,13 +54,13 @@ public class BulletGeometryProvider : BaseGeometryProvider
         return true;
     }
 
-    private static GeometryData? GetBulletGeometry(ColliderShape colliderhape, Matrix worldTransform)
+    private static GeometryData? GetBulletGeometry(ColliderShape colliderShape, Matrix worldTransform)
     {
         var geometry = new GeometryData();
 
         // Interate through all the colliders shapes while queueing all shapes in compound shapes to process those as well
         Queue<ColliderShape> shapesToProcess = new();
-        shapesToProcess.Enqueue(colliderhape);
+        shapesToProcess.Enqueue(colliderShape);
         while (shapesToProcess.Count > 0)
         {
             var shape = shapesToProcess.Dequeue();
