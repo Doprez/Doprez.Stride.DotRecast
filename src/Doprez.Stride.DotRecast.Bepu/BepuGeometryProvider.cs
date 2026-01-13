@@ -14,44 +14,55 @@ namespace Doprez.Stride.DotRecast.Bepu;
 /// <summary>
 /// Used to determine static geometry/shapes that can be used with a navigation mesh.
 /// </summary>
-public class BepuStaticGeometry : BaseGeometryProvider
+public class BepuGeometryProvider : BaseGeometryProvider
 {
     public CollisionMask CollidersToInclude { get; set; } = CollisionMask.Everything;
 
-    private readonly Logger _logger = GlobalLogger.GetLogger(nameof(BepuStaticGeometry));
+    private readonly Logger _logger = GlobalLogger.GetLogger(nameof(BepuGeometryProvider));
 
-    public override bool TryGetTransformedShapeInfo(Entity entity, out GeometryData? shapeData)
+    public override bool TryGetComponent(Entity entity, out EntityComponent component)
+    {
+        component = entity.Get<StaticComponent>();
+        return component != null;
+    }
+
+    public override bool TryGetTransformedShapeInfo(Entity entity, out GeometryData shapeData)
     {
         var collidable = entity.Get<CollidableComponent>();
+        bool isNull = false;
 
         // Only use StaticColliders for the nav mesh build.
         if (collidable is not StaticComponent)
         {
             _logger.Info($"Entity {entity.Name} does not have a {nameof(StaticComponent)}. Only StaticColliders are supported for navigation mesh generation.");
-            shapeData = null;
+            shapeData = new();
             return false;
         }
 
         if (!CollidersToInclude.IsSet(collidable.CollisionLayer))
         {
             _logger.Info($"Entity {entity.Name} is not part of a valid collision layer.");
-            shapeData = null;
+            shapeData = new();
             return false;
         }
 
         if(collidable.Collider is CompoundCollider compoundCollider)
         {
             shapeData = GetCompoundGeometry(compoundCollider, collidable.Entity.Transform.WorldMatrix);
-            return shapeData != null;
+            isNull = shapeData == null;
+            shapeData ??= new();
+            return isNull;
         }
         else if (collidable.Collider is MeshCollider meshCollider)
         {
             shapeData = GetMeshGeometry(meshCollider, collidable.Entity.Transform.WorldMatrix);
-            return shapeData != null;
+            isNull = shapeData == null;
+            shapeData ??= new();
+            return isNull;
         }
 
-        _logger.Error($"Unsupported collider type {collidable.Collider.GetType().Name} for entity {collidable.Entity.Name}. Only CompoundCollider and MeshCollider are supported for navigation mesh generation.");
-        shapeData = null;
+        _logger.Error($"Problem getting info from collider type {collidable.Collider.GetType().Name} for entity {collidable.Entity.Name}.");
+        shapeData = new();
         return false;
     }
 

@@ -1,5 +1,4 @@
-﻿using Doprez.Stride.DotRecast.Recast.Components;
-using DotRecast.Core.Collections;
+﻿using DotRecast.Core.Collections;
 using Stride.Core;
 using Stride.Core.Mathematics;
 using Stride.Engine;
@@ -12,7 +11,7 @@ namespace Doprez.Stride.DotRecast.Detour;
 [DefaultEntityComponentProcessor(typeof(NavigationAgentProcessor), ExecutionMode = ExecutionMode.Runtime)]
 public class NavigationAgentComponent : StartupScript
 {
-    public required NavigationMeshComponent NavMesh { get; set; }
+    //public required NavigationMeshComponent NavMesh { get; set; }
 
     /// <summary>
     /// The speed at which the agent moves.
@@ -67,20 +66,20 @@ public class NavigationAgentComponent : StartupScript
     /// <returns></returns>
     public virtual bool TryFindPath(Vector3 target)
     {
-        var navMesh = NavMesh?.DynamicNavMesh?.NavMesh();
-        if (NavMesh is null || navMesh is null)
-        {
-            State = NavigationState.PathIsInvalid;
-            return false;
-        }
+    //    var navMesh = NavMesh?.DynamicNavMesh?.NavMesh();
+    //    if (NavMesh is null || navMesh is null)
+    //    {
+    //        State = NavigationState.PathIsInvalid;
+    //        return false;
+    //    }
 
-        Target = target;
-        if (NavMesh.TryFindPath(Entity.Transform.WorldMatrix.TranslationVector, Target, Polys.AsSpan(), ref Path))
-        {
-            State = NavigationState.PathIsReady;
-            return true;
-        }
-        State = NavigationState.PathIsInvalid;
+    //    Target = target;
+    //    if (NavMesh.TryFindPath(Entity.Transform.WorldMatrix.TranslationVector, Target, Polys.AsSpan(), ref Path))
+    //    {
+    //        State = NavigationState.PathIsReady;
+    //        return true;
+    //    }
+    //    State = NavigationState.PathIsInvalid;
         return false;
     }
 
