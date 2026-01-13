@@ -95,7 +95,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                 var hashCode = CellHeight.GetHashCode();
                 hashCode = (hashCode * 397) ^ CellSize.GetHashCode();
                 hashCode = (hashCode * 397) ^ TileSize;
-                hashCode = (hashCode * 397) ^ MinRegionArea.GetHashCode();
+                hashCode = (hashCode * 397) ^ MinRegionArea;
                 hashCode = (hashCode * 397) ^ RegionMergeArea.GetHashCode();
                 hashCode = (hashCode * 397) ^ MaxEdgeLen.GetHashCode();
                 hashCode = (hashCode * 397) ^ MaxEdgeError.GetHashCode();
