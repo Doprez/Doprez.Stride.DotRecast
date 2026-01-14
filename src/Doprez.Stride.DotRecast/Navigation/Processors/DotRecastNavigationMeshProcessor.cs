@@ -21,6 +21,11 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
 
         component.Entity.Scene.Entities.CollectionChanged += CollectionChanged;
 
+        foreach(var provider in component.GeometryProviders)
+        {
+            provider.Initialize(Services);
+        }
+
         foreach (var otherEntity in component.Entity.Scene.Entities)
         {
             if(TryAddDataToComponent(otherEntity, component))

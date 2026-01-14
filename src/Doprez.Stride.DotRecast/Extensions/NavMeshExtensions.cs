@@ -24,7 +24,7 @@ public static class NavMeshExtensions
         {
             while (layers.MoveNext())
             {
-                Model model = new Model();
+                Model model = [];
 
                 var currentLayer = layers.Current.Value;
                 var currentId = layers.Current.Key;
@@ -39,14 +39,13 @@ public static class NavMeshExtensions
                     DotRecastNavigationMeshTile tile = p.Value;
 
                     // Extract vertex data
-                    List<Vector3> tileVertexList = new List<Vector3>();
-                    List<int> tileIndexList = new List<int>();
+                    List<Vector3> tileVertexList = [];
+                    List<int> tileIndexList = [];
                     if (!tile.GetTileVertices(tileVertexList, tileIndexList))
                         continue;
 
                     // Check if updated
-                    NavigationMeshLayer sourceLayer;
-                    if (previousNavigationMesh != null && previousNavigationMesh.Layers.TryGetValue(currentId, out sourceLayer))
+                    if (previousNavigationMesh != null && previousNavigationMesh.Layers.TryGetValue(currentId, out NavigationMeshLayer? sourceLayer))
                     {
                         DotRecastNavigationMeshTile oldTile = sourceLayer.FindTile(p.Key);
                         if (oldTile != null && oldTile.Data == tile.Data)
@@ -54,33 +53,36 @@ public static class NavMeshExtensions
                     }
 
                     // Stack layers vertically
-                    Vector3 offset = new Vector3(0.0f, LayerHeightMultiplier, 0.0f);
+                    Vector3 offset = new(0.0f, LayerHeightMultiplier, 0.0f);
 
                     // Calculate mesh bounding box from navigation mesh points
                     BoundingBox bb = BoundingBox.Empty;
 
-                    List<VertexPositionNormalTexture> meshVertices = new List<VertexPositionNormalTexture>();
+                    List<VertexPositionNormalTexture> meshVertices = [];
                     for (int i = 0; i < tileVertexList.Count; i++)
                     {
                         Vector3 position = tileVertexList[i] + offset;
                         BoundingBox.Merge(ref bb, ref position, out bb);
 
-                        VertexPositionNormalTexture vert = new VertexPositionNormalTexture();
-                        vert.Position = position;
-                        vert.Normal = Vector3.UnitY;
-                        vert.TextureCoordinate = new Vector2(0.5f, 0.5f);
+                        VertexPositionNormalTexture vert = new()
+                        {
+                            Position = position,
+                            Normal = Vector3.UnitY,
+                            TextureCoordinate = new Vector2(0.5f, 0.5f)
+                        };
                         meshVertices.Add(vert);
                     }
 
                     MeshDraw draw;
-                    using (var meshData = new GeometricMeshData<VertexPositionNormalTexture>(meshVertices.ToArray(), tileIndexList.ToArray(), true))
-                    using (var primitive = new GeometricPrimitive(game.GraphicsDevice, meshData))
+                    using (var meshData = new GeometricMeshData<VertexPositionNormalTexture>([.. meshVertices], [.. tileIndexList], true))
                     {
+                        var primitive = new GeometricPrimitive(game.GraphicsDevice, meshData);
+
                         //ret.GeneratedDynamicPrimitives.Add(primitive);
                         draw = primitive.ToMeshDraw();
                     }
 
-                    Mesh mesh = new Mesh
+                    Mesh mesh = new()
                     {
                         Draw = draw,
                         MaterialIndex = updated ? 1 : 0,

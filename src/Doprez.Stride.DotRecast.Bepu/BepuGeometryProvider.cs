@@ -48,15 +48,15 @@ public class BepuGeometryProvider : BaseGeometryProvider
 
         if(collidable.Collider is CompoundCollider compoundCollider)
         {
-            shapeData = GetCompoundGeometry(compoundCollider, collidable.Entity.Transform.WorldMatrix);
-            isNull = shapeData == null;
+            shapeData = GetCompoundGeometry(compoundCollider, collidable.Entity.Transform.WorldMatrix)!;
+            isNull = shapeData != null;
             shapeData ??= new();
             return isNull;
         }
         else if (collidable.Collider is MeshCollider meshCollider)
         {
-            shapeData = GetMeshGeometry(meshCollider, collidable.Entity.Transform.WorldMatrix);
-            isNull = shapeData == null;
+            shapeData = GetMeshGeometry(meshCollider, collidable.Entity.Transform.WorldMatrix)!;
+            isNull = shapeData != null;
             shapeData ??= new();
             return isNull;
         }

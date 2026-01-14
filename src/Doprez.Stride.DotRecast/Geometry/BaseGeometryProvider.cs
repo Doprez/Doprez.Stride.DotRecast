@@ -12,6 +12,14 @@ public abstract class BaseGeometryProvider
     public void Initialize(IServiceRegistry registry)
     {
         Services = registry;
+        OnInitialize();
+    }
+
+    /// <summary>
+    /// Called after the provider has been initialized.
+    /// </summary>
+    protected virtual void OnInitialize()
+    {
     }
 
     /// <summary>
