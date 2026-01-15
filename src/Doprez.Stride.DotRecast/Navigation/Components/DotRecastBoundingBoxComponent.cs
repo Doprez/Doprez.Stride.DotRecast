@@ -13,7 +13,6 @@ namespace Doprez.Stride.DotRecast.Navigation.Components
     /// A three dimensional bounding box  using the scale of the owning entity as the box extent. This is used to limit the area in which navigation meshes are generated
     /// </summary>
     [DataContract]
-    [DefaultEntityComponentProcessor(typeof(DotRecastBoundingBoxProcessor), ExecutionMode = ExecutionMode.Runtime)]
     [Display("DotRecast bounding box")]
     [ComponentCategory("DotRecast")]
     public class DotRecastBoundingBoxComponent : EntityComponent

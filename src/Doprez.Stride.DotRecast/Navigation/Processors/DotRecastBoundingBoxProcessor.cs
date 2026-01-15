@@ -2,9 +2,8 @@
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
 using Doprez.Stride.DotRecast.Navigation.Components;
-using Stride.Core;
+using Stride.Core.Annotations;
 using Stride.Engine;
-using Stride.Games;
 
 namespace Doprez.Stride.DotRecast.Navigation.Processors
 {
@@ -12,17 +11,19 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
     {
         public ICollection<DotRecastBoundingBoxComponent> BoundingBoxes => ComponentDatas.Keys;
 
-        protected override void OnSystemAdd()
+        public delegate void CollectionChangedEventHandler(DotRecastBoundingBoxComponent component);
+
+        public event CollectionChangedEventHandler? BoundingBoxAdded;
+        public event CollectionChangedEventHandler? BoundingboxRemoved;
+
+        protected override void OnEntityComponentAdding(Entity entity, [NotNull] DotRecastBoundingBoxComponent component, [NotNull] DotRecastBoundingBoxComponent data)
         {
-            // TODO Plugins
-            // This is the same kind of entry point as used in PhysicsProcessor
-            var gameSystems = Services.GetSafeServiceAs<IGameSystemCollection>();
-            var navigationSystem = gameSystems.OfType<DynamicNavigationMeshSystem>().FirstOrDefault();
-            if (navigationSystem == null)
-            {
-                navigationSystem = new DynamicNavigationMeshSystem(Services);
-                gameSystems.Add(navigationSystem);
-            }
+            BoundingBoxAdded?.Invoke(component);
+        }
+
+        protected override void OnEntityComponentRemoved(Entity entity, [NotNull] DotRecastBoundingBoxComponent component, [NotNull] DotRecastBoundingBoxComponent data)
+        {
+            BoundingboxRemoved?.Invoke(component);
         }
     }
 }

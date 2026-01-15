@@ -1,13 +1,16 @@
 ﻿using Doprez.Stride.DotRecast.Geometry;
+using Doprez.Stride.DotRecast.Navigation.Processors;
 using Stride.Core;
 using Stride.Core.Annotations;
 using Stride.Core.Reflection;
 using Stride.Engine;
+using Stride.Engine.Design;
 
 namespace Doprez.Stride.DotRecast.Navigation.Components;
 
 [DataContract(nameof(DotRecastNavigationMeshComponent))]
 [ObjectFactory(typeof(DotRecastNavigationMeshComponentFactory))]
+[DefaultEntityComponentProcessor(typeof(DotRecastNavigationMeshProcessor), ExecutionMode = ExecutionMode.Runtime)]
 [ComponentCategory("DotRecast")]
 public class DotRecastNavigationMeshComponent : EntityComponent
 {

@@ -7,9 +7,9 @@ namespace Doprez.Stride.DotRecast.Geometry;
 public abstract class BaseGeometryProvider
 {
     [DataMemberIgnore]
-    public IServiceRegistry Services = null!;
+    protected IServiceRegistry Services = null!;
 
-    public void Initialize(IServiceRegistry registry)
+    internal void Initialize(IServiceRegistry registry)
     {
         Services = registry;
         OnInitialize();

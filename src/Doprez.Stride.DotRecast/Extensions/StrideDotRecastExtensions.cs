@@ -6,9 +6,6 @@ namespace Doprez.Stride.DotRecast.Extensions;
 
 public static class StrideDotRecastExtensions
 {
-    // hopefully wont be a thing in the future
-    // https://github.com/ikpil/DotRecast/issues/12
-    // https://github.com/ikpil/DotRecast/tree/pr/change-rcvec3-to-numerics-verctor3
     public static RcVec3f ToDotRecastVector(this Vector3 vec)
     {
         return Unsafe.As<Vector3, RcVec3f>(ref vec);
