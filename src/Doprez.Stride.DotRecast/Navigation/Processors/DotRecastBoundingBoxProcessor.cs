@@ -16,6 +16,11 @@ namespace Doprez.Stride.DotRecast.Navigation.Processors
         public event CollectionChangedEventHandler? BoundingBoxAdded;
         public event CollectionChangedEventHandler? BoundingboxRemoved;
 
+        internal DotRecastBoundingBoxProcessor() : base(typeof(DotRecastBoundingBoxComponent))
+        {
+            Order = 100_001;
+        }
+
         protected override void OnEntityComponentAdding(Entity entity, [NotNull] DotRecastBoundingBoxComponent component, [NotNull] DotRecastBoundingBoxComponent data)
         {
             BoundingBoxAdded?.Invoke(component);

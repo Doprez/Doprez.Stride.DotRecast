@@ -21,7 +21,7 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     /// <summary>
     /// Raised when the navigation mesh for the current scene is updated
     /// </summary>
-    public event EventHandler<NavigationMeshUpdatedEventArgs> NavigationMeshUpdated;
+    public event EventHandler<NavigationMeshUpdatedEventArgs>? NavigationMeshUpdated;
 
     /// <summary>
     /// The most recently built navigation mesh
@@ -30,13 +30,18 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
 
     private SceneInstance? _currentSceneInstance;
 
-    private CancellationTokenSource _buildTaskCancellationTokenSource;
+    private CancellationTokenSource? _buildTaskCancellationTokenSource;
 
     private SceneSystem _sceneSystem = null!;
     private ScriptSystem _scriptSystem = null!;
     private DotRecastBoundingBoxProcessor _processor = null!;
 
     private readonly List<DotRecastBoundingBoxComponent> _boundingBoxComponents = [];
+
+    public DotRecastNavigationMeshProcessor() : base(typeof(DotRecastNavigationMeshComponent))
+    {
+        Order = 100_000;
+    }
 
     protected override void OnSystemAdd()
     {
@@ -54,7 +59,7 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     /// <inheritdoc />
     protected override void OnEntityComponentAdding(Entity entity, DotRecastNavigationMeshComponent component, DotRecastNavigationMeshComponent data)
     {
-        component.MeshBuilder = new(Services, [.. component.GeometryProviders]);
+        component.MeshBuilder = new([.. component.GeometryProviders]);
 
         component.Entity.Scene.Entities.CollectionChanged += CollectionChanged;
 
@@ -190,10 +195,10 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     /// <summary>
     /// Starts an asynchronous rebuild of the navigation mesh
     /// </summary>
-    public async Task<NavigationMeshBuildResult> Rebuild(DotRecastNavigationMeshComponent navMeshComponent)
+    public async Task Rebuild(DotRecastNavigationMeshComponent navMeshComponent)
     {
         if (_currentSceneInstance == null)
-            return new NavigationMeshBuildResult();
+            return;
 
         // Cancel running build, TODO check if the running build can actual satisfy the current rebuild request and don't cancel in that case
         _buildTaskCancellationTokenSource?.Cancel();
@@ -202,7 +207,7 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
         // Collect bounding boxes
         var boundingBoxProcessor = _currentSceneInstance.GetProcessor<DotRecastBoundingBoxProcessor>();
         if (boundingBoxProcessor == null)
-            return new NavigationMeshBuildResult();
+            return;
 
         List<BoundingBox> boundingBoxes = [];
         foreach (var boundingBox in boundingBoxProcessor.BoundingBoxes)
@@ -211,37 +216,9 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
             boundingBoxes.Add(new BoundingBox(translation - boundingBox.Size * scale, translation + boundingBox.Size * scale));
         }
 
-        var buildSettings = navMeshComponent.BuildSettings;
+        var result = await navMeshComponent.UpdateNavMesh(boundingBoxes, _buildTaskCancellationTokenSource);
 
-        var result = Task.Run(() =>
-        {
-            // Only have one active build at a time
-            lock (navMeshComponent.MeshBuilder)
-            {
-                return navMeshComponent.MeshBuilder.Build(buildSettings, navMeshComponent.Groups, boundingBoxes, _buildTaskCancellationTokenSource.Token);
-            }
-        });
-
-        await result;
-
-        FinalizeRebuild(result);
-
-        return result.Result;
-    }
-
-    private void FinalizeRebuild(Task<NavigationMeshBuildResult> resultTask)
-    {
-        var result = resultTask.Result;
-        if (result.Success)
-        {
-            var args = new NavigationMeshUpdatedEventArgs
-            {
-                OldNavigationMesh = CurrentNavigationMesh,
-                BuildResult = result,
-            };
-            CurrentNavigationMesh = result.NavigationMesh;
-            NavigationMeshUpdated?.Invoke(this, args);
-        }
+        NavigationMeshUpdated?.Invoke(this, result);
     }
 
     private void Cleanup()

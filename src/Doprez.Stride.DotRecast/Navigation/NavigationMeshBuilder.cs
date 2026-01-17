@@ -27,16 +27,13 @@ namespace Doprez.Stride.DotRecast.Navigation
         private readonly HashSet<Guid> _registeredGuids = [];
         private readonly BaseGeometryProvider[] _geometryProviders = [];
 
-        private readonly IServiceRegistry _services;
-
         /// <summary>
         /// Initializes the builder, optionally with a previous navigation mesh when building incrementally
         /// </summary>
         /// <param name="oldNavigationMesh">The previous navigation mesh, to allow incremental builds</param>
-        public NavigationMeshBuilder(IServiceRegistry services, BaseGeometryProvider[] geometryProviders, DotRecastNavigationMesh oldNavigationMesh = null)
+        public NavigationMeshBuilder(BaseGeometryProvider[] geometryProviders, DotRecastNavigationMesh? oldNavigationMesh = null)
         {
             _oldNavigationMesh = oldNavigationMesh;
-            _services = services;
             _geometryProviders = geometryProviders;
         }
 

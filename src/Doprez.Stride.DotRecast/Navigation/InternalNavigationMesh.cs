@@ -54,7 +54,7 @@ internal class InternalNavigationMesh
     public bool DoPathFindQuery(PathFindQuery query, ref Span<DtStraightPath> result)
     {
         // Find the starting polygons and point on it to start from
-        DtQueryDefaultFilter filter = new DtQueryDefaultFilter();
+        DtQueryDefaultFilter filter = new();
         DtStatus status = navQuery.FindNearestPoly(query.Source.ToDotRecastVector(), query.FindNearestPolyExtent.ToDotRecastVector(), filter, out long startPoly, out RcVec3f startPoint, out _);
         if (status.Failed())
             return false;
@@ -95,7 +95,7 @@ internal class InternalNavigationMesh
     {
         // Reset result
         result = new NavigationRaycastResult { Hit = false };
-        DtQueryDefaultFilter filter = new DtQueryDefaultFilter();
+        DtQueryDefaultFilter filter = new();
 
         DtStatus status = navQuery.FindNearestPoly(query.Source.ToDotRecastVector(), query.FindNearestPolyExtent.ToDotRecastVector(), filter, out long startPoly, out _, out _);
         if (status.Failed())

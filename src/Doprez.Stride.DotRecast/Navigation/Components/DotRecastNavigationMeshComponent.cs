@@ -2,6 +2,7 @@
 using Doprez.Stride.DotRecast.Navigation.Processors;
 using Stride.Core;
 using Stride.Core.Annotations;
+using Stride.Core.Mathematics;
 using Stride.Core.Reflection;
 using Stride.Engine;
 using Stride.Engine.Design;
@@ -61,6 +62,46 @@ public class DotRecastNavigationMeshComponent : EntityComponent
     [DataMemberIgnore]
     public bool PendingRebuild { get; set; }
 
+    /// <summary>
+    /// The most recently built navigation mesh
+    /// </summary>
+    [DataMemberIgnore]
+    public DotRecastNavigationMesh? CurrentNavigationMesh { get; private set; }
+
+    public async Task<NavigationMeshUpdatedEventArgs> UpdateNavMesh(List<BoundingBox> boundingBoxes, CancellationTokenSource _buildTaskCancellationTokenSource)
+    {
+
+        var result = Task.Run(() =>
+        {
+            // Only have one active build at a time
+            lock (MeshBuilder)
+            {
+                return MeshBuilder.Build(BuildSettings, Groups, boundingBoxes, _buildTaskCancellationTokenSource.Token);
+            }
+        });
+
+        await result;
+
+        var finalizeRebuild = FinalizeRebuild(result);
+
+        return finalizeRebuild;
+    }
+
+    private NavigationMeshUpdatedEventArgs? FinalizeRebuild(Task<NavigationMeshBuildResult> resultTask)
+    {
+        var result = resultTask.Result;
+        if (result.Success)
+        {
+            var args = new NavigationMeshUpdatedEventArgs
+            {
+                OldNavigationMesh = CurrentNavigationMesh,
+                BuildResult = result,
+            };
+            CurrentNavigationMesh = result.NavigationMesh;
+            return args;
+        }
+        return null;
+    }
 }
 
 public class DotRecastNavigationMeshComponentFactory : IObjectFactory
