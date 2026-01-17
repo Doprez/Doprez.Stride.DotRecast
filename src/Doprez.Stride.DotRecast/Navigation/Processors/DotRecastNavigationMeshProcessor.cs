@@ -79,6 +79,7 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     /// <inheritdoc />
     protected override void OnEntityComponentRemoved(Entity entity, DotRecastNavigationMeshComponent component, DotRecastNavigationMeshComponent data)
     {
+        component.Entity.Scene.Entities.CollectionChanged -= CollectionChanged;
         SettingsRemoved?.Invoke(component);
     }
 

@@ -68,28 +68,31 @@ public class DotRecastNavigationMeshComponent : EntityComponent
     [DataMemberIgnore]
     public DotRecastNavigationMesh? CurrentNavigationMesh { get; private set; }
 
-    public async Task<NavigationMeshUpdatedEventArgs> UpdateNavMesh(List<BoundingBox> boundingBoxes, CancellationTokenSource _buildTaskCancellationTokenSource)
+    public async Task<NavigationMeshUpdatedEventArgs?> UpdateNavMesh(List<BoundingBox> boundingBoxes, CancellationTokenSource buildTaskCancellationTokenSource)
     {
+        NavigationMeshBuildResult result;
 
-        var result = Task.Run(() =>
+        try
         {
-            // Only have one active build at a time
-            lock (MeshBuilder)
+            // Run the potentially heavy build work on a background thread but avoid blocking on Task.Result
+            result = await Task.Run(() =>
             {
-                return MeshBuilder.Build(BuildSettings, Groups, boundingBoxes, _buildTaskCancellationTokenSource.Token);
-            }
-        });
+                lock (MeshBuilder)
+                {
+                    return MeshBuilder.Build(BuildSettings, Groups, boundingBoxes, buildTaskCancellationTokenSource.Token);
+                }
+            }, buildTaskCancellationTokenSource.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return null;
+        }
 
-        await result;
-
-        var finalizeRebuild = FinalizeRebuild(result);
-
-        return finalizeRebuild;
+        return FinalizeRebuild(result);
     }
 
-    private NavigationMeshUpdatedEventArgs? FinalizeRebuild(Task<NavigationMeshBuildResult> resultTask)
+    private NavigationMeshUpdatedEventArgs? FinalizeRebuild(NavigationMeshBuildResult result)
     {
-        var result = resultTask.Result;
         if (result.Success)
         {
             var args = new NavigationMeshUpdatedEventArgs
@@ -100,6 +103,7 @@ public class DotRecastNavigationMeshComponent : EntityComponent
             CurrentNavigationMesh = result.NavigationMesh;
             return args;
         }
+
         return null;
     }
 }
