@@ -15,6 +15,77 @@ public static class NavMeshExtensions
 {
     private const float LayerHeightMultiplier = 0.05f;
 
+    /// <summary>
+    /// Creates a single debug entity for a specific navigation mesh tile.
+    /// </summary>
+    public static Entity CreateDebugEntity(IGame game, DotRecastNavigationMeshTile tile, Color4 color)
+    {
+        Entity parent = new($"Debug entity for navigation mesh tile");
+
+        if (tile == null)
+            return parent;
+
+        // Extract vertex data for this tile only
+        List<Vector3> tileVertexList = [];
+        List<int> tileIndexList = [];
+        if (!tile.GetTileVertices(tileVertexList, tileIndexList))
+            return parent;
+
+        // Stack layers vertically
+        Vector3 offset = new(0.0f, LayerHeightMultiplier, 0.0f);
+
+        // Calculate mesh bounding box from navigation mesh points
+        BoundingBox bb = BoundingBox.Empty;
+
+        List<VertexPositionNormalTexture> meshVertices = [];
+        for (int i = 0; i < tileVertexList.Count; i++)
+        {
+            Vector3 position = tileVertexList[i] + offset;
+            BoundingBox.Merge(ref bb, ref position, out bb);
+
+            VertexPositionNormalTexture vert = new()
+            {
+                Position = position,
+                Normal = Vector3.UnitY,
+                TextureCoordinate = new Vector2(0.5f, 0.5f)
+            };
+            meshVertices.Add(vert);
+        }
+
+        if (meshVertices.Count == 0 || tileIndexList.Count == 0)
+            return parent;
+
+        MeshDraw draw;
+        using (var meshData = new GeometricMeshData<VertexPositionNormalTexture>([.. meshVertices], [.. tileIndexList], true))
+        {
+            var primitive = new GeometricPrimitive(game.GraphicsDevice, meshData);
+            draw = primitive.ToMeshDraw();
+        }
+
+        // Single material for this tile
+        Model model = [];
+        model.Add(CreateDebugMaterial(game, color));
+
+        Mesh mesh = new()
+        {
+            Draw = draw,
+            MaterialIndex = 0,
+            BoundingBox = bb,
+        };
+        model.Add(mesh);
+
+        var tileEntity = new Entity("Navigation tile")
+        {
+            new ModelComponent(model)
+            {
+                IsShadowCaster = false,
+            }
+        };
+
+        parent.AddChild(tileEntity);
+        return parent;
+    }
+
     public static Entity CreateDebugEntity(IGame game, DotRecastNavigationMesh navigationMesh, DotRecastNavigationMesh previousNavigationMesh)
     {
         Entity parent = new($"Debug entity for navigation mesh");
@@ -124,7 +195,7 @@ public static class NavMeshExtensions
         var navmeshMaterialPass = navmeshMaterial.Passes[0];
         navmeshMaterialPass.Parameters.Set(MaterialKeys.DiffuseValue, deviceSpaceColor);
         navmeshMaterialPass.Parameters.Set(MaterialKeys.EmissiveValue, deviceSpaceColor);
-        navmeshMaterialPass.Parameters.Set(MaterialKeys.EmissiveIntensity, 1.0f);
+        navmeshMaterialPass.Parameters.Set(MaterialKeys.EmissiveIntensity, 0.5f);
         navmeshMaterialPass.HasTransparency = true;
 
         return navmeshMaterial;
