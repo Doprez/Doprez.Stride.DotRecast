@@ -189,7 +189,7 @@ public static class NavMeshExtensions
         });
 
         Color4 deviceSpaceColor = color.ToColorSpace(game.GraphicsDevice.ColorSpace);
-        deviceSpaceColor.A = 0.33f;
+        deviceSpaceColor.A = 0.7f;
 
         // set the color to the material
         var navmeshMaterialPass = navmeshMaterial.Passes[0];

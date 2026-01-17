@@ -74,21 +74,14 @@ public class DotRecastNavigationMeshComponent : EntityComponent
 
         try
         {
-            // Run the potentially heavy build work on a background thread but avoid blocking on Task.Result
-            result = await Task.Run(() =>
-            {
-                lock (MeshBuilder)
-                {
-                    return MeshBuilder.Build(BuildSettings, Groups, boundingBoxes, buildTaskCancellationTokenSource.Token);
-                }
-            }, buildTaskCancellationTokenSource.Token).ConfigureAwait(false);
+            return FinalizeRebuild(
+                MeshBuilder.Build(BuildSettings, Groups, boundingBoxes, buildTaskCancellationTokenSource.Token)
+            );
         }
         catch (OperationCanceledException)
         {
             return null;
         }
-
-        return FinalizeRebuild(result);
     }
 
     private NavigationMeshUpdatedEventArgs? FinalizeRebuild(NavigationMeshBuildResult result)
