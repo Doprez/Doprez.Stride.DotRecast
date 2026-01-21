@@ -68,20 +68,22 @@ public class DotRecastNavigationMeshComponent : EntityComponent
     [DataMemberIgnore]
     public DotRecastNavigationMesh? CurrentNavigationMesh { get; private set; }
 
-    public async Task<NavigationMeshUpdatedEventArgs?> UpdateNavMesh(List<BoundingBox> boundingBoxes, CancellationTokenSource buildTaskCancellationTokenSource)
+    public NavigationMeshUpdatedEventArgs? UpdateNavMesh(List<BoundingBox> boundingBoxes, CancellationTokenSource buildTaskCancellationTokenSource)
     {
-        NavigationMeshBuildResult result;
-
         try
         {
-            return FinalizeRebuild(
-                MeshBuilder.Build(BuildSettings, Groups, boundingBoxes, buildTaskCancellationTokenSource.Token)
-            );
+            var result = MeshBuilder.Build(BuildSettings, Groups, boundingBoxes);
+            return FinalizeRebuild(result);
         }
         catch (OperationCanceledException)
         {
             return null;
         }
+    }
+
+    internal void MarkTilesForRebuild(ICollection<BoundingBox> boundingBoxes)
+    {
+
     }
 
     private NavigationMeshUpdatedEventArgs? FinalizeRebuild(NavigationMeshBuildResult result)

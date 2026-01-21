@@ -17,7 +17,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <summary>
         /// State of static colliders by their component Id that was used for building
         /// </summary>
-        public readonly Dictionary<Guid, DotRecastNavigationMeshCachedObject> Objects = new();
+        public readonly Dictionary<Guid, DotRecastNavigationMeshCachedObject> Objects = [];
         
         /// <summary>
         /// The bounding boxes used for build
@@ -28,6 +28,8 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// Hash for the building settings used
         /// </summary>
         public int SettingsHash = 0;
+
+        public GeometryData Geometry = new();
 
         /// <summary>
         /// Registers a new processed object that is build into the navigation mesh
@@ -44,6 +46,8 @@ namespace Doprez.Stride.DotRecast.Navigation
                 ParameterHash = entityColliderHash,
                 Geometry = data,
             });
+
+            Geometry.AppendOther(data);
         }
     }
 }

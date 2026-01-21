@@ -102,15 +102,7 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
         {
             foreach (var navMeshComponent in ComponentDatas.Values)
             {
-                if (navMeshComponent.PendingRebuild)
-                {
-                    _scriptSystem.AddTask(async () =>
-                    {
-                        await _scriptSystem.NextFrame();
-                        await Rebuild(navMeshComponent);
-                    });
-                }
-
+                Rebuild(navMeshComponent);
                 navMeshComponent.PendingRebuild = false;
             }
         }
@@ -196,7 +188,7 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     /// <summary>
     /// Starts an asynchronous rebuild of the navigation mesh
     /// </summary>
-    public async Task Rebuild(DotRecastNavigationMeshComponent navMeshComponent)
+    public void Rebuild(DotRecastNavigationMeshComponent navMeshComponent)
     {
         if (_currentSceneInstance == null)
             return;
@@ -217,7 +209,7 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
             boundingBoxes.Add(new BoundingBox(translation - boundingBox.Size * scale, translation + boundingBox.Size * scale));
         }
 
-        var result = await navMeshComponent.UpdateNavMesh(boundingBoxes, _buildTaskCancellationTokenSource);
+        var result = navMeshComponent.UpdateNavMesh(boundingBoxes, _buildTaskCancellationTokenSource);
 
         NavigationMeshUpdated?.Invoke(this, result);
     }

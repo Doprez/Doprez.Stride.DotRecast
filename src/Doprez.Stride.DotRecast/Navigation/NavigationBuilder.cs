@@ -21,7 +21,7 @@ internal class NavigationBuilder(BuildSettings buildSettings)
     private RcPolyMesh polyMesh;
     private RcPolyMeshDetail meshDetail;
     private DtMeshData navmeshData;
-    
+
     public GeneratedData BuildNavmesh(ref Vector3[] vertices, ref int[] indices)
     {
         GeneratedData ret = result;
