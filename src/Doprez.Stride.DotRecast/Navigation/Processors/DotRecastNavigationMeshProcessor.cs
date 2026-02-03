@@ -209,7 +209,7 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
 
         var result = navMeshComponent.UpdateNavMesh(boundingBoxes, _buildTaskCancellationTokenSource);
 
-        if (result.OldNavigationMesh == result.BuildResult?.NavigationMesh) return;
+        if (result?.OldNavigationMesh == result?.BuildResult?.NavigationMesh) return;
         NavigationMeshUpdated?.Invoke(this, result);
     }
 
