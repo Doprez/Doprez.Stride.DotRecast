@@ -19,7 +19,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         public bool CollidersChanged = true;
 
         internal static Logger Logger = GlobalLogger.GetLogger(nameof(NavigationMeshBuilder));
-        internal static bool EnableDebugLogs { get; set; }
+        internal static bool EnableDebugLogs { get; set; } = true;
 
         private static void LogDebug(string message)
         {
@@ -126,6 +126,15 @@ namespace Doprez.Stride.DotRecast.Navigation
 
             var afterCopyColliders = DateTime.UtcNow;
             LogDebug($"Copied {collidersLocal.Length} colliders in {(afterCopyColliders - buildStartTimestamp).TotalMilliseconds:F2} ms");
+
+            // If nothing changed (colliders, settings, or build region), reuse the existing navigation mesh
+            if (_oldNavigationMesh != null && !CollidersChanged && lastCache != null && lastCache.SettingsHash == settingsHash && BoundingBoxesEqual(lastCache.BoundingBoxes, boundingBoxes) && _tilesToBuild.Count == 0)
+            {
+                result.Success = true;
+                result.NavigationMesh = _oldNavigationMesh;
+                Logger.Info("Navigation mesh build skipped: no changes detected");
+                return result;
+            }
 
             BuildInput(collidersLocal);
 
@@ -505,6 +514,21 @@ namespace Doprez.Stride.DotRecast.Navigation
             {
                 _oldNavigationMesh = null;
             }
+        }
+
+        private static bool BoundingBoxesEqual(ICollection<BoundingBox> previous, ICollection<BoundingBox> current)
+        {
+            if (previous.Count != current.Count)
+                return false;
+
+            // Both collections are expected to be small; use Contains to avoid extra allocations
+            foreach (var box in previous)
+            {
+                if (!current.Contains(box))
+                    return false;
+            }
+
+            return true;
         }
 
         /// <summary>
