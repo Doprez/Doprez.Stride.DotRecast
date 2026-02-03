@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation and Contributors (https://dotnetfoundation.org/ & https://stride3d.net)
 // Distributed under the MIT license. See the LICENSE.md file in the project root for more information.
 
+using System.Buffers;
 using DotRecast.Core;
 using DotRecast.Core.Numerics;
 using DotRecast.Detour;
@@ -22,7 +23,7 @@ internal class NavigationBuilder(BuildSettings buildSettings)
     private RcPolyMeshDetail meshDetail;
     private DtMeshData navmeshData;
 
-    public GeneratedData BuildNavmesh(ref Vector3[] vertices, ref int[] indices)
+    public GeneratedData BuildNavmesh(ReadOnlySpan<Vector3> vertices, ReadOnlySpan<int> indices)
     {
         GeneratedData ret = result;
         ret.Success = false;
@@ -78,24 +79,41 @@ internal class NavigationBuilder(BuildSettings buildSettings)
         int width = tileSize + borderSize * 2;
         int height = tileSize + borderSize * 2;
         
-        if (vertices?.Length == 0 || indices?.Length == 0 || walkableClimb < 0)
+        if (vertices.Length == 0 || indices.Length == 0 || walkableClimb < 0)
             return ret;
 
         solid = new RcHeightfield(width, height, bmin, bmax, buildSettings.CellSize, buildSettings.CellHeight, borderSize);
         
-        int numTriangles = indices!.Length / 3;
+        int numTriangles = indices.Length / 3;
 
-        float[] verts = new float[vertices!.Length * 3];
-        for (int i = 0; i < vertices!.Length; i++)
+        float[] verts = ArrayPool<float>.Shared.Rent(vertices.Length * 3);
+        int[] indexArray = ArrayPool<int>.Shared.Rent(indices.Length);
+
+        try
         {
-            verts[i * 3 + 0] = vertices[i].X;
-            verts[i * 3 + 1] = vertices[i].Y;
-            verts[i * 3 + 2] = vertices[i].Z;
+            var vertsSpan = verts.AsSpan(0, vertices.Length * 3);
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                vertsSpan[i * 3 + 0] = vertices[i].X;
+                vertsSpan[i * 3 + 1] = vertices[i].Y;
+                vertsSpan[i * 3 + 2] = vertices[i].Z;
+            }
+
+            indices.CopyTo(indexArray);
+            if (indexArray.Length > indices.Length)
+            {
+                Array.Clear(indexArray, indices.Length, indexArray.Length - indices.Length);
+            }
+            
+            // Find walkable triangles and rasterize into heightfield
+            triAreas = RcRecast.MarkWalkableTriangles(context, buildSettings.AgentMaxSlope, verts, indexArray, numTriangles, new RcAreaModification(RcAreaModification.RC_AREA_FLAGS_MASK));
+            RcRasterizations.RasterizeTriangles(context,  verts, indexArray, triAreas, numTriangles, solid, walkableClimb);
         }
-        
-        // Find walkable triangles and rasterize into heightfield
-        triAreas = RcRecast.MarkWalkableTriangles(context, buildSettings.AgentMaxSlope, verts, indices, numTriangles, new RcAreaModification(RcAreaModification.RC_AREA_FLAGS_MASK));
-        RcRasterizations.RasterizeTriangles(context,  verts, indices, triAreas, numTriangles, solid, walkableClimb);
+        finally
+        {
+            ArrayPool<float>.Shared.Return(verts, clearArray: false);
+            ArrayPool<int>.Shared.Return(indexArray, clearArray: false);
+        }
         
         // Filter walkable surfaces.
         RcFilters.FilterLowHangingWalkableObstacles(context, walkableClimb, solid);
@@ -147,16 +165,18 @@ internal class NavigationBuilder(BuildSettings buildSettings)
 
     private bool CreateDetourMesh()
     {
-        DtNavMeshCreateParams createParams = new DtNavMeshCreateParams();
-        createParams.verts = polyMesh.verts;
-        createParams.vertCount = polyMesh.nverts;
-        createParams.polys = polyMesh.polys;
-        createParams.polyAreas = polyMesh.areas;
-        createParams.polyFlags = polyMesh.flags;
-        createParams.polyCount = polyMesh.npolys;
-        createParams.nvp = polyMesh.nvp;
-        createParams.detailMeshes = meshDetail?.meshes;
-        createParams.detailVerts = meshDetail?.verts;
+        DtNavMeshCreateParams createParams = new()
+        {
+            verts = polyMesh.verts,
+            vertCount = polyMesh.nverts,
+            polys = polyMesh.polys,
+            polyAreas = polyMesh.areas,
+            polyFlags = polyMesh.flags,
+            polyCount = polyMesh.npolys,
+            nvp = polyMesh.nvp,
+            detailMeshes = meshDetail?.meshes,
+            detailVerts = meshDetail?.verts
+        };
         if (meshDetail != null)
         {
             createParams.detailVertsCount = meshDetail.nverts;

@@ -16,15 +16,22 @@ namespace Doprez.Stride.DotRecast.Navigation
     public class NavigationMeshBuilder
     {
 
-        public bool NewColliderAdded = true;
+        public bool CollidersChanged = true;
 
         internal static Logger Logger = GlobalLogger.GetLogger(nameof(NavigationMeshBuilder));
+        internal static bool EnableDebugLogs { get; set; }
+
+        private static void LogDebug(string message)
+        {
+            if (!EnableDebugLogs)
+                return;
+
+            Logger.Debug(message);
+        }
 
         private DotRecastNavigationMesh? _oldNavigationMesh;
-        private GeometryData _colliderGeometryCache = new();
 
-        private readonly List<StaticColliderData> _colliders = [];
-        private readonly HashSet<Guid> _registeredGuids = [];
+        private readonly Dictionary<Guid, StaticColliderData> _colliders = [];
         private readonly BaseGeometryProvider[] _geometryProviders = [];
         private readonly HashSet<Point> _tilesToBuild = [];
 
@@ -50,10 +57,10 @@ namespace Doprez.Stride.DotRecast.Navigation
         {
             lock (_colliders)
             {
-                if (_registeredGuids.Contains(colliderData.Component.Id))
+                if (_colliders.ContainsKey(colliderData.Component.Id))
                     throw new InvalidOperationException("Duplicate collider added");
-                _colliders.Add(colliderData);
-                _registeredGuids.Add(colliderData.Component.Id);
+                _colliders.Add(colliderData.Component.Id, colliderData);
+                CollidersChanged = true;
             }
         }
 
@@ -65,10 +72,10 @@ namespace Doprez.Stride.DotRecast.Navigation
         {
             lock (_colliders)
             {
-                if (!_registeredGuids.Contains(colliderData.Component.Id))
+                if (!_colliders.ContainsKey(colliderData.Component.Id))
                     throw new InvalidOperationException("Trying to remove unregistered collider");
-                _colliders.Remove(colliderData);
-                _registeredGuids.Remove(colliderData.Component.Id);
+                _colliders.Remove(colliderData.Component.Id);
+                CollidersChanged = true;
             }
         }
 
@@ -114,16 +121,16 @@ namespace Doprez.Stride.DotRecast.Navigation
             StaticColliderData[] collidersLocal;
             lock (_colliders)
             {
-                collidersLocal = [.. _colliders];
+                collidersLocal = [.. _colliders.Values];
             }
 
             var afterCopyColliders = DateTime.UtcNow;
-            Logger.Debug($"Copied {collidersLocal.Length} colliders in {(afterCopyColliders - buildStartTimestamp).TotalMilliseconds:F2} ms");
+            LogDebug($"Copied {collidersLocal.Length} colliders in {(afterCopyColliders - buildStartTimestamp).TotalMilliseconds:F2} ms");
 
             BuildInput(collidersLocal);
 
             var afterBuildInput = DateTime.UtcNow;
-            Logger.Debug($"BuildInput completed in {(afterBuildInput - afterCopyColliders).TotalMilliseconds:F2} ms");
+            LogDebug($"BuildInput completed in {(afterBuildInput - afterCopyColliders).TotalMilliseconds:F2} ms");
 
             // The new navigation mesh that will be created
             result.NavigationMesh = new DotRecastNavigationMesh
@@ -137,7 +144,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             newCache.SettingsHash = settingsHash;
 
             var afterGlobalBounds = DateTime.UtcNow;
-            Logger.Debug($"Computed global bounding box in {(afterGlobalBounds - afterBuildInput).TotalMilliseconds:F2} ms");
+            LogDebug($"Computed global bounding box in {(afterGlobalBounds - afterBuildInput).TotalMilliseconds:F2} ms");
 
             // Combine input and collect tiles to build
             GeometryData sceneNavigationMeshInputBuilder = new();
@@ -151,14 +158,13 @@ namespace Doprez.Stride.DotRecast.Navigation
                 newCache.Add(colliderData.Component, colliderData.Geometry, colliderData.ParameterHash);
             }
 
-            // TODO: Generate tile local mesh input data
-            var inputVertices = sceneNavigationMeshInputBuilder.Points.ToArray();
-            var inputIndices = sceneNavigationMeshInputBuilder.Indices.ToArray();
+            ReadOnlySpan<Vector3> inputVertices = sceneNavigationMeshInputBuilder.Points;
+            ReadOnlySpan<int> inputIndices = sceneNavigationMeshInputBuilder.Indices;
 
             var afterCombineInput = DateTime.UtcNow;
-            Logger.Debug($"Combined input geometry and populated cache in {(afterCombineInput - afterGlobalBounds).TotalMilliseconds:F2} ms");
+            LogDebug($"Combined input geometry and populated cache in {(afterCombineInput - afterGlobalBounds).TotalMilliseconds:F2} ms");
 
-            Logger.Debug($"Building navigation mesh with {groups.Count} layers, {collidersLocal.Length} colliders, {boundingBoxes.Count} bounding boxes");
+            LogDebug($"Building navigation mesh with {groups.Count} layers, {collidersLocal.Length} colliders, {boundingBoxes.Count} bounding boxes");
 
             BuildTiles(buildSettings, boundingBoxes, groups, inputVertices, inputIndices, newCache, result);
 
@@ -204,7 +210,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             StaticColliderData[] collidersLocal;
             lock (_colliders)
             {
-                collidersLocal = [.. _colliders];
+                collidersLocal = [.. _colliders.Values];
             }
 
             // Mark tiles for every collider
@@ -262,10 +268,12 @@ namespace Doprez.Stride.DotRecast.Navigation
                     }
                 }
             }
+
+            Logger.Info($"{_tilesToBuild.Count} tiles left to be built.");
         }
 
         internal void BuildTiles(DotRecastNavigationMeshBuildSettings buildSettings, ICollection<BoundingBox> boundingBoxes,
-            ICollection<DotRecastNavigationMeshGroup> groups, Vector3[] inputVertices, int[] inputIndices, 
+            ICollection<DotRecastNavigationMeshGroup> groups, ReadOnlySpan<Vector3> inputVertices, ReadOnlySpan<int> inputIndices, 
             DotRecastNavigationMeshCache newCache, in NavigationMeshBuildResult result)
         {
             // Enumerate over every layer, and build tiles for each of those layers using the provided agent settings
@@ -289,31 +297,35 @@ namespace Doprez.Stride.DotRecast.Navigation
                     MarkTilesToBuild(buildSettings, currentAgentSettings, boundingBoxes, newCache);
 
                     // Once all of the Tiles are marked, reset the flag
-                    NewColliderAdded = false;
+                    CollidersChanged = false;
 
                     if (_tilesToBuild.Count == 0)
                     {
-                        Logger.Debug($"Layer {currentGroup.Id}: no tiles to build");
-                        return;
+                        LogDebug($"Layer {currentGroup.Id}: no tiles to build");
+
+                        // Preserve existing tiles for this layer if nothing new needs to be built
+                        var existingLayer = new NavigationMeshLayer();
+                        result.NavigationMesh.LayersInternal.Add(currentGroup.Id, existingLayer);
+
+                        if (_oldNavigationMesh != null && _oldNavigationMesh.LayersInternal.TryGetValue(currentGroup.Id, out var existingSourceLayer))
+                        {
+                            foreach (var sourceTile in existingSourceLayer.Tiles)
+                            {
+                                existingLayer.TilesInternal.Add(sourceTile.Key, sourceTile.Value);
+                            }
+                        }
+
+                        continue;
                     }
 
                     ConcurrentCollector<Tuple<Point, DotRecastNavigationMeshTile>> builtTiles = new(_tilesToBuild.Count);
 
                     // I only want to build up to MaxDegreeOfParallelism tiles at once in favour of batched builds.
                     var tilesToBuildCount = _tilesToBuild.Count < Dispatcher.MaxDegreeOfParallelism ? _tilesToBuild.Count : Dispatcher.MaxDegreeOfParallelism;
-                    // Spans are not allowed in lambda expressions, so we use a normal for loop here
-                    //Dispatcher.For(0, tilesToBuildCount, i =>
-                    //{
-                    //    var coord = _tilesToBuild.ElementAt(i);
-                    //    // Builds the tile, or returns null when there is nothing generated for this tile (empty tile)
-                    //    DotRecastNavigationMeshTile meshTile = BuildTile(coord, buildSettings, currentAgentSettings, boundingBoxes,
-                    //        inputVertices, inputIndices);
 
-                    //    // Add the result to the list of built tiles
-                    //    builtTiles.Add(new Tuple<Point, DotRecastNavigationMeshTile>(coord, meshTile));
-                    //});
-
-                    for( int i = 0;  i < tilesToBuildCount; i++ )
+                    // Build tile as last in first out to allow removal from the list in a single loop.
+                    var currentTilesToBuildCount = _tilesToBuild.Count;
+                    for ( int i = currentTilesToBuildCount - 1;  i >= currentTilesToBuildCount - tilesToBuildCount; i--)
                     {
                         var coord = _tilesToBuild.ElementAt(i);
                         // Builds the tile, or returns null when there is nothing generated for this tile (empty tile)
@@ -321,15 +333,11 @@ namespace Doprez.Stride.DotRecast.Navigation
                             inputVertices, inputIndices);
                         // Add the result to the list of built tiles
                         builtTiles.Add(new Tuple<Point, DotRecastNavigationMeshTile>(coord, meshTile));
-                    }
-
-                    foreach (var coord in builtTiles)
-                    {
-                        _tilesToBuild.Remove(coord.Item1);
+                        _tilesToBuild.Remove(_tilesToBuild.ElementAt(i));
                     }
 
                     var afterTileBuild = DateTime.UtcNow;
-                    Logger.Debug($"Layer {currentGroup.Id}: built {builtTiles.Count} tiles in {(afterTileBuild - layerStartTimestamp).TotalMilliseconds:F2} ms");
+                    LogDebug($"Layer {currentGroup.Id}: built {builtTiles.Count} tiles in {(afterTileBuild - layerStartTimestamp).TotalMilliseconds:F2} ms");
 
                     // Add layer to the navigation mesh
                     var layer = new NavigationMeshLayer();
@@ -374,13 +382,13 @@ namespace Doprez.Stride.DotRecast.Navigation
                     }
 
                     var afterLayerFinalize = DateTime.UtcNow;
-                    Logger.Debug($"Layer {currentGroup.Id}: finalize and update info in {(afterLayerFinalize - afterTileBuild).TotalMilliseconds:F2} ms");
+                    LogDebug($"Layer {currentGroup.Id}: finalize and update info in {(afterLayerFinalize - afterTileBuild).TotalMilliseconds:F2} ms");
                 }
             }
         }
 
         private static DotRecastNavigationMeshTile BuildTile(Point tileCoordinate, DotRecastNavigationMeshBuildSettings buildSettings, DotRecastNavigationAgentSettings agentSettings,
-            ICollection<BoundingBox> boundingBoxes, Vector3[] inputVertices, int[] inputIndices)
+            ICollection<BoundingBox> boundingBoxes, ReadOnlySpan<Vector3> inputVertices, ReadOnlySpan<int> inputIndices)
         {
             var tileStartTimestamp = DateTime.UtcNow;
             DotRecastNavigationMeshTile? meshTile = null;
@@ -435,7 +443,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                 };
 
                 var builder = new NavigationBuilder(internalBuildSettings);
-                GeneratedData generatedData = builder.BuildNavmesh(ref inputVertices, ref inputIndices);
+                GeneratedData generatedData = builder.BuildNavmesh(inputVertices, inputIndices);
 
                 if (generatedData.Success)
                 {
@@ -448,7 +456,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             }
 
             var afterTile = DateTime.UtcNow;
-            Logger.Debug($"Tile {tileCoordinate}: total tile build in {(afterTile - tileStartTimestamp).TotalMilliseconds:F2} ms");
+            LogDebug($"Tile {tileCoordinate}: total tile build in {(afterTile - tileStartTimestamp).TotalMilliseconds:F2} ms");
 
             return meshTile;
         }
@@ -508,12 +516,12 @@ namespace Doprez.Stride.DotRecast.Navigation
             BoundingBox boundingBoxToCheck = inputBuilder.BoundingBox;
             NavigationMeshBuildUtils.ExtendBoundingBox(ref boundingBoxToCheck, new Vector3(agentSettings.Radius));
 
-            Logger.Debug("Marking tiles for bounding box: " + boundingBoxToCheck);
+            LogDebug("Marking tiles for bounding box: " + boundingBoxToCheck);
 
             List<Point> newTileList = NavigationMeshBuildUtils.GetOverlappingTiles(buildSettings, boundingBoxToCheck);
             foreach (Point p in newTileList)
             {
-                Logger.Debug("Marking tile to be rebuilt: " + p);
+                LogDebug("Marking tile to be rebuilt: " + p);
                 tilesToBuild.Add(p);
             }
         }

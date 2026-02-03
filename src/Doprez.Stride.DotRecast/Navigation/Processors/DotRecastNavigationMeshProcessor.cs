@@ -33,7 +33,6 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     private CancellationTokenSource? _buildTaskCancellationTokenSource;
 
     private SceneSystem _sceneSystem = null!;
-    private ScriptSystem _scriptSystem = null!;
     private DotRecastBoundingBoxProcessor _processor = null!;
 
     private readonly List<DotRecastBoundingBoxComponent> _boundingBoxComponents = [];
@@ -46,7 +45,6 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     protected override void OnSystemAdd()
     {
         _sceneSystem = Services.GetSafeServiceAs<SceneSystem>();
-        _scriptSystem = Services.GetSafeServiceAs<ScriptSystem>();
     }
 
     protected override void OnSystemRemove()
@@ -102,8 +100,8 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
         {
             foreach (var navMeshComponent in ComponentDatas.Values)
             {
+                if (!navMeshComponent.PendingRebuild) continue;
                 Rebuild(navMeshComponent);
-                navMeshComponent.PendingRebuild = false;
             }
         }
     }

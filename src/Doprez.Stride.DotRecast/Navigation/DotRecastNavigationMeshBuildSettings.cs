@@ -114,8 +114,8 @@ namespace Doprez.Stride.DotRecast.Navigation
             {
                 CellHeight = 0.2f,
                 CellSize = 0.3f,
-                TileSize = 32,
-                MinRegionArea = 2,
+                TileSize = 128,
+                MinRegionArea = 8,
                 RegionMergeArea = 20,
                 MaxEdgeLen = 12.0f,
                 MaxEdgeError = 1.3f,

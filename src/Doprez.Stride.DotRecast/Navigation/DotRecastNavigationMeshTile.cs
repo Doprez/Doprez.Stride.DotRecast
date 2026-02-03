@@ -73,7 +73,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// </summary>
         internal class NavigationMeshTileSerializer : DataSerializer<DotRecastNavigationMeshTile>
         {
-            private DataSerializer<Vector3> pointSerializer;
+            private DataSerializer<Vector3> pointSerializer = null!;
 
             public override void Initialize(SerializerSelector serializerSelector)
             {
