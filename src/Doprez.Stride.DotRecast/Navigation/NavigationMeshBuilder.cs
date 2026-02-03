@@ -15,16 +15,25 @@ namespace Doprez.Stride.DotRecast.Navigation
     /// </summary>
     public class NavigationMeshBuilder
     {
-        /// <summary>
-        /// The logger to send additional information to
-        /// </summary>
-        public static Logger Logger = GlobalLogger.GetLogger(nameof(NavigationMeshBuilder));
+
+        public bool CollidersChanged = true;
+
+        internal static Logger Logger = GlobalLogger.GetLogger(nameof(NavigationMeshBuilder));
+        internal static bool EnableDebugLogs { get; set; } = true;
+
+        private static void LogDebug(string message)
+        {
+            if (!EnableDebugLogs)
+                return;
+
+            Logger.Debug(message);
+        }
 
         private DotRecastNavigationMesh? _oldNavigationMesh;
 
-        private readonly List<StaticColliderData> _colliders = [];
-        private readonly HashSet<Guid> _registeredGuids = [];
+        private readonly Dictionary<Guid, StaticColliderData> _colliders = [];
         private readonly BaseGeometryProvider[] _geometryProviders = [];
+        private readonly HashSet<Point> _tilesToBuild = [];
 
         /// <summary>
         /// Initializes the builder, optionally with a previous navigation mesh when building incrementally
@@ -48,10 +57,10 @@ namespace Doprez.Stride.DotRecast.Navigation
         {
             lock (_colliders)
             {
-                if (_registeredGuids.Contains(colliderData.Component.Id))
+                if (_colliders.ContainsKey(colliderData.Component.Id))
                     throw new InvalidOperationException("Duplicate collider added");
-                _colliders.Add(colliderData);
-                _registeredGuids.Add(colliderData.Component.Id);
+                _colliders.Add(colliderData.Component.Id, colliderData);
+                CollidersChanged = true;
             }
         }
 
@@ -63,10 +72,10 @@ namespace Doprez.Stride.DotRecast.Navigation
         {
             lock (_colliders)
             {
-                if (!_registeredGuids.Contains(colliderData.Component.Id))
+                if (!_colliders.ContainsKey(colliderData.Component.Id))
                     throw new InvalidOperationException("Trying to remove unregistered collider");
-                _colliders.Remove(colliderData);
-                _registeredGuids.Remove(colliderData.Component.Id);
+                _colliders.Remove(colliderData.Component.Id);
+                CollidersChanged = true;
             }
         }
 
@@ -79,8 +88,8 @@ namespace Doprez.Stride.DotRecast.Navigation
         /// <param name="boundingBoxes">A collection of bounding boxes to use as the region for which to generate navigation mesh tiles</param>
         /// <param name="cancellationToken">A cancellation token to interrupt the build process</param>
         /// <returns>The build result</returns>
-        public NavigationMeshBuildResult  Build(DotRecastNavigationMeshBuildSettings buildSettings, ICollection<DotRecastNavigationMeshGroup> groups,
-            ICollection<BoundingBox> boundingBoxes, CancellationToken cancellationToken)
+        public NavigationMeshBuildResult Build(DotRecastNavigationMeshBuildSettings buildSettings, ICollection<DotRecastNavigationMeshGroup> groups,
+            ICollection<BoundingBox> boundingBoxes)
         {
             var buildStartTimestamp = DateTime.UtcNow;
             Logger.Info("Navigation mesh build started");
@@ -112,19 +121,25 @@ namespace Doprez.Stride.DotRecast.Navigation
             StaticColliderData[] collidersLocal;
             lock (_colliders)
             {
-                collidersLocal = [.. _colliders];
+                collidersLocal = [.. _colliders.Values];
             }
 
             var afterCopyColliders = DateTime.UtcNow;
-            Logger.Info($"Copied {collidersLocal.Length} colliders in {(afterCopyColliders - buildStartTimestamp).TotalMilliseconds:F2} ms");
+            LogDebug($"Copied {collidersLocal.Length} colliders in {(afterCopyColliders - buildStartTimestamp).TotalMilliseconds:F2} ms");
+
+            // If nothing changed (colliders, settings, or build region), reuse the existing navigation mesh
+            if (_oldNavigationMesh != null && !CollidersChanged && lastCache != null && lastCache.SettingsHash == settingsHash && BoundingBoxesEqual(lastCache.BoundingBoxes, boundingBoxes) && _tilesToBuild.Count == 0)
+            {
+                result.Success = true;
+                result.NavigationMesh = _oldNavigationMesh;
+                Logger.Info("Navigation mesh build skipped: no changes detected");
+                return result;
+            }
 
             BuildInput(collidersLocal);
 
             var afterBuildInput = DateTime.UtcNow;
-            Logger.Info($"BuildInput completed in {(afterBuildInput - afterCopyColliders).TotalMilliseconds:F2} ms");
-
-            // Check if cache was cleared while building the input
-            lastCache = _oldNavigationMesh?.Cache;
+            LogDebug($"BuildInput completed in {(afterBuildInput - afterCopyColliders).TotalMilliseconds:F2} ms");
 
             // The new navigation mesh that will be created
             result.NavigationMesh = new DotRecastNavigationMesh
@@ -137,15 +152,8 @@ namespace Doprez.Stride.DotRecast.Navigation
             DotRecastNavigationMeshCache newCache = result.NavigationMesh.Cache = new DotRecastNavigationMeshCache();
             newCache.SettingsHash = settingsHash;
 
-            // Generate global bounding box for planes
-            BoundingBox globalBoundingBox = BoundingBox.Empty;
-            foreach (var boundingBox in boundingBoxes)
-            {
-                globalBoundingBox = BoundingBox.Merge(boundingBox, globalBoundingBox);
-            }
-
             var afterGlobalBounds = DateTime.UtcNow;
-            Logger.Info($"Computed global bounding box in {(afterGlobalBounds - afterBuildInput).TotalMilliseconds:F2} ms");
+            LogDebug($"Computed global bounding box in {(afterGlobalBounds - afterBuildInput).TotalMilliseconds:F2} ms");
 
             // Combine input and collect tiles to build
             GeometryData sceneNavigationMeshInputBuilder = new();
@@ -159,154 +167,15 @@ namespace Doprez.Stride.DotRecast.Navigation
                 newCache.Add(colliderData.Component, colliderData.Geometry, colliderData.ParameterHash);
             }
 
-            // TODO: Generate tile local mesh input data
-            var inputVertices = sceneNavigationMeshInputBuilder.Points.ToArray();
-            var inputIndices = sceneNavigationMeshInputBuilder.Indices.ToArray();
+            ReadOnlySpan<Vector3> inputVertices = sceneNavigationMeshInputBuilder.Points;
+            ReadOnlySpan<int> inputIndices = sceneNavigationMeshInputBuilder.Indices;
 
             var afterCombineInput = DateTime.UtcNow;
-            Logger.Info($"Combined input geometry and populated cache in {(afterCombineInput - afterGlobalBounds).TotalMilliseconds:F2} ms");
+            LogDebug($"Combined input geometry and populated cache in {(afterCombineInput - afterGlobalBounds).TotalMilliseconds:F2} ms");
 
-            Logger.Info($"Building navigation mesh with {groups.Count} layers, {collidersLocal.Length} colliders, {boundingBoxes.Count} bounding boxes");
+            LogDebug($"Building navigation mesh with {groups.Count} layers, {collidersLocal.Length} colliders, {boundingBoxes.Count} bounding boxes");
 
-            // Enumerate over every layer, and build tiles for each of those layers using the provided agent settings
-            using (var groupEnumerator = groups.NotNull().GetEnumerator())
-            {
-                for (int layerIndex = 0; layerIndex < groups.Count; layerIndex++)
-                {
-                    var layerStartTimestamp = DateTime.UtcNow;
-
-                    groupEnumerator.MoveNext();
-                    var currentGroup = groupEnumerator.Current;
-                    var currentAgentSettings = currentGroup.AgentSettings;
-
-                    if (result.NavigationMesh.LayersInternal.ContainsKey(currentGroup.Id))
-                    {
-                        Logger.Error($"The same group can't be selected twice: {currentGroup}");
-                        return result;
-                    }
-
-                    HashSet<Point> tilesToBuild = [];
-
-                    foreach (var colliderData in collidersLocal)
-                    {
-                        if (colliderData.Geometry == null)
-                            continue;
-
-                        if (!colliderData.Processed)
-                        {
-                            MarkTiles(colliderData.Geometry, ref buildSettings, ref currentAgentSettings, tilesToBuild);
-                            if (colliderData.Previous != null)
-                            {
-                                MarkTiles(colliderData.Previous.Geometry, ref buildSettings, ref currentAgentSettings, tilesToBuild);
-                            }
-                        }
-                    }
-
-                    // Check for removed colliders
-                    if (lastCache != null)
-                    {
-                        foreach (var obj in lastCache.Objects)
-                        {
-                            if (!newCache.Objects.ContainsKey(obj.Key))
-                            {
-                                MarkTiles(obj.Value.Geometry, ref buildSettings, ref currentAgentSettings, tilesToBuild);
-                            }
-                        }
-                    }
-
-                    // Calculate updated/added bounding boxes
-                    foreach (var boundingBox in boundingBoxes)
-                    {
-                        if (!lastCache?.BoundingBoxes.Contains(boundingBox) ?? true) // In the case of no case, mark all tiles in all bounding boxes to be rebuilt
-                        {
-                            var tiles = NavigationMeshBuildUtils.GetOverlappingTiles(buildSettings, boundingBox);
-                            foreach (var tile in tiles)
-                            {
-                                tilesToBuild.Add(tile);
-                            }
-                        }
-                    }
-
-                    // Check for removed bounding boxes
-                    if (lastCache != null)
-                    {
-                        foreach (var boundingBox in lastCache.BoundingBoxes)
-                        {
-                            if (!boundingBoxes.Contains(boundingBox))
-                            {
-                                var tiles = NavigationMeshBuildUtils.GetOverlappingTiles(buildSettings, boundingBox);
-                                foreach (var tile in tiles)
-                                {
-                                    tilesToBuild.Add(tile);
-                                }
-                            }
-                        }
-                    }
-
-                    ConcurrentCollector<Tuple<Point, DotRecastNavigationMeshTile>> builtTiles = new(tilesToBuild.Count);
-                    Dispatcher.ForEach(tilesToBuild.ToArray(), tileCoordinate =>
-                    {
-                        // Allow cancellation while building tiles
-                        if (cancellationToken.IsCancellationRequested)
-                            return;
-
-                        // Builds the tile, or returns null when there is nothing generated for this tile (empty tile)
-                        DotRecastNavigationMeshTile meshTile = BuildTile(tileCoordinate, buildSettings, currentAgentSettings, boundingBoxes,
-                            inputVertices, inputIndices);
-
-                        // Add the result to the list of built tiles
-                        builtTiles.Add(new Tuple<Point, DotRecastNavigationMeshTile>(tileCoordinate, meshTile));
-                    });
-
-                    var afterTileBuild = DateTime.UtcNow;
-                    Logger.Info($"Layer {currentGroup.Id}: built {builtTiles.Count} tiles in {(afterTileBuild - layerStartTimestamp).TotalMilliseconds:F2} ms");
-
-                    if (cancellationToken.IsCancellationRequested)
-                    {
-                        Logger.Warning("Operation cancelled");
-                        return result;
-                    }
-
-                    // Add layer to the navigation mesh
-                    var layer = new NavigationMeshLayer();
-                    result.NavigationMesh.LayersInternal.Add(currentGroup.Id, layer);
-
-                    // Copy tiles from the previous build into the current
-                    if (_oldNavigationMesh != null && _oldNavigationMesh.LayersInternal.TryGetValue(currentGroup.Id, out var sourceLayer))
-                    {
-                        foreach (var sourceTile in sourceLayer.Tiles)
-                            layer.TilesInternal.Add(sourceTile.Key, sourceTile.Value);
-                    }
-
-                    foreach (var p in builtTiles)
-                    {
-                        if (p.Item2 == null)
-                        {
-                            // Remove a tile
-                            layer.TilesInternal.Remove(p.Item1);
-                        }
-                        else
-                        {
-                            // Set or update tile
-                            layer.TilesInternal[p.Item1] = p.Item2;
-                        }
-                    }
-
-                    // Add information about which tiles were updated to the result
-                    if (tilesToBuild.Count > 0)
-                    {
-                        var layerUpdateInfo = new NavigationMeshLayerUpdateInfo
-                        {
-                            GroupId = currentGroup.Id,
-                            UpdatedTiles = [.. tilesToBuild]
-                        };
-                        result.UpdatedLayers.Add(layerUpdateInfo);
-                    }
-
-                    var afterLayerFinalize = DateTime.UtcNow;
-                    Logger.Info($"Layer {currentGroup.Id}: finalize and update info in {(afterLayerFinalize - afterTileBuild).TotalMilliseconds:F2} ms");
-                }
-            }
+            BuildTiles(buildSettings, boundingBoxes, groups, inputVertices, inputIndices, newCache, result);
 
             // Check for removed layers
             if (_oldNavigationMesh != null)
@@ -341,9 +210,196 @@ namespace Doprez.Stride.DotRecast.Navigation
             return result;
         }
 
-        private static DotRecastNavigationMeshTile BuildTile(Point tileCoordinate, DotRecastNavigationMeshBuildSettings buildSettings, DotRecastNavigationAgentSettings agentSettings,
-            ICollection<BoundingBox> boundingBoxes, Vector3[] inputVertices, int[] inputIndices)
+        internal void MarkTilesToBuild(DotRecastNavigationMeshBuildSettings buildSettings, DotRecastNavigationAgentSettings agentSettings,
+            ICollection<BoundingBox> boundingBoxes, DotRecastNavigationMeshCache newCache)
         {
+            var lastCache = _oldNavigationMesh?.Cache;
+
+            // Copy colliders so the collection doesn't get modified
+            StaticColliderData[] collidersLocal;
+            lock (_colliders)
+            {
+                collidersLocal = [.. _colliders.Values];
+            }
+
+            // Mark tiles for every collider
+            foreach (var colliderData in collidersLocal)
+            {
+                if (colliderData.Geometry == null)
+                    continue;
+                if (!colliderData.Processed)
+                {
+                    MarkTiles(colliderData.Geometry, ref buildSettings, ref agentSettings, _tilesToBuild);
+                    if (colliderData.Previous != null)
+                    {
+                        MarkTiles(colliderData.Previous.Geometry, ref buildSettings, ref agentSettings, _tilesToBuild);
+                    }
+                }
+            }
+
+            // Check for removed colliders
+            if (lastCache != null)
+            {
+                foreach (var obj in lastCache.Objects)
+                {
+                    if (!newCache.Objects.ContainsKey(obj.Key))
+                    {
+                        MarkTiles(obj.Value.Geometry, ref buildSettings, ref agentSettings, _tilesToBuild);
+                    }
+                }
+            }
+
+            // Calculate updated/added bounding boxes
+            foreach (var boundingBox in boundingBoxes)
+            {
+                if (!lastCache?.BoundingBoxes.Contains(boundingBox) ?? true) // In the case of no case, mark all tiles in all bounding boxes to be rebuilt
+                {
+                    var tiles = NavigationMeshBuildUtils.GetOverlappingTiles(buildSettings, boundingBox);
+                    foreach (var tile in tiles)
+                    {
+                        _tilesToBuild.Add(tile);
+                    }
+                }
+            }
+
+            // Check for removed bounding boxes
+            if (lastCache != null)
+            {
+                foreach (var boundingBox in lastCache.BoundingBoxes)
+                {
+                    if (!boundingBoxes.Contains(boundingBox))
+                    {
+                        var tiles = NavigationMeshBuildUtils.GetOverlappingTiles(buildSettings, boundingBox);
+                        foreach (var tile in tiles)
+                        {
+                            _tilesToBuild.Add(tile);
+                        }
+                    }
+                }
+            }
+
+            Logger.Info($"{_tilesToBuild.Count} tiles left to be built.");
+        }
+
+        internal void BuildTiles(DotRecastNavigationMeshBuildSettings buildSettings, ICollection<BoundingBox> boundingBoxes,
+            ICollection<DotRecastNavigationMeshGroup> groups, ReadOnlySpan<Vector3> inputVertices, ReadOnlySpan<int> inputIndices, 
+            DotRecastNavigationMeshCache newCache, in NavigationMeshBuildResult result)
+        {
+            // Enumerate over every layer, and build tiles for each of those layers using the provided agent settings
+            using (var groupEnumerator = groups.NotNull().GetEnumerator())
+            {
+                for (int layerIndex = 0; layerIndex < groups.Count; layerIndex++)
+                {
+                    var layerStartTimestamp = DateTime.UtcNow;
+
+                    groupEnumerator.MoveNext();
+                    var currentGroup = groupEnumerator.Current;
+                    var currentAgentSettings = currentGroup.AgentSettings;
+
+                    if (result.NavigationMesh.LayersInternal.ContainsKey(currentGroup.Id))
+                    {
+                        Logger.Error($"The same group can't be selected twice: {currentGroup}");
+                        return;
+                    }
+
+                    // Determine which tiles need to be built for this layer
+                    MarkTilesToBuild(buildSettings, currentAgentSettings, boundingBoxes, newCache);
+
+                    // Once all of the Tiles are marked, reset the flag
+                    CollidersChanged = false;
+
+                    if (_tilesToBuild.Count == 0)
+                    {
+                        LogDebug($"Layer {currentGroup.Id}: no tiles to build");
+
+                        // Preserve existing tiles for this layer if nothing new needs to be built
+                        var existingLayer = new NavigationMeshLayer();
+                        result.NavigationMesh.LayersInternal.Add(currentGroup.Id, existingLayer);
+
+                        if (_oldNavigationMesh != null && _oldNavigationMesh.LayersInternal.TryGetValue(currentGroup.Id, out var existingSourceLayer))
+                        {
+                            foreach (var sourceTile in existingSourceLayer.Tiles)
+                            {
+                                existingLayer.TilesInternal.Add(sourceTile.Key, sourceTile.Value);
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    ConcurrentCollector<Tuple<Point, DotRecastNavigationMeshTile>> builtTiles = new(_tilesToBuild.Count);
+
+                    // I only want to build up to MaxDegreeOfParallelism tiles at once in favour of batched builds.
+                    var tilesToBuildCount = _tilesToBuild.Count < Dispatcher.MaxDegreeOfParallelism ? _tilesToBuild.Count : Dispatcher.MaxDegreeOfParallelism;
+
+                    // Build tile as last in first out to allow removal from the list in a single loop.
+                    var currentTilesToBuildCount = _tilesToBuild.Count;
+                    for ( int i = currentTilesToBuildCount - 1;  i >= currentTilesToBuildCount - tilesToBuildCount; i--)
+                    {
+                        var coord = _tilesToBuild.ElementAt(i);
+                        // Builds the tile, or returns null when there is nothing generated for this tile (empty tile)
+                        DotRecastNavigationMeshTile meshTile = BuildTile(coord, buildSettings, currentAgentSettings, boundingBoxes,
+                            inputVertices, inputIndices);
+                        // Add the result to the list of built tiles
+                        builtTiles.Add(new Tuple<Point, DotRecastNavigationMeshTile>(coord, meshTile));
+                        _tilesToBuild.Remove(_tilesToBuild.ElementAt(i));
+                    }
+
+                    var afterTileBuild = DateTime.UtcNow;
+                    LogDebug($"Layer {currentGroup.Id}: built {builtTiles.Count} tiles in {(afterTileBuild - layerStartTimestamp).TotalMilliseconds:F2} ms");
+
+                    // Add layer to the navigation mesh
+                    var layer = new NavigationMeshLayer();
+                    result.NavigationMesh.LayersInternal.Add(currentGroup.Id, layer);
+
+                    // Copy tiles from the previous build into the current
+                    if (_oldNavigationMesh != null && _oldNavigationMesh.LayersInternal.TryGetValue(currentGroup.Id, out var sourceLayer))
+                    {
+                        foreach (var sourceTile in sourceLayer.Tiles)
+                            layer.TilesInternal.Add(sourceTile.Key, sourceTile.Value);
+                    }
+
+                    foreach (var p in builtTiles)
+                    {
+                        if (p.Item2 == null)
+                        {
+                            // Remove a tile
+                            layer.TilesInternal.Remove(p.Item1);
+                        }
+                        else
+                        {
+                            // Set or update tile
+                            layer.TilesInternal[p.Item1] = p.Item2;
+                        }
+                    }
+
+                    Point[] updatedTile = new Point[builtTiles.Count];
+                    for (int i = 0; i < builtTiles.Count; i++) 
+                    {
+                        updatedTile[i] = builtTiles[i].Item1;
+                    }
+
+                    // Add information about which tiles were updated to the result
+                    if (_tilesToBuild.Count > 0)
+                    {
+                        var layerUpdateInfo = new NavigationMeshLayerUpdateInfo
+                        {
+                            GroupId = currentGroup.Id,
+                            UpdatedTiles = [.. updatedTile]
+                        };
+                        result.UpdatedLayers.Add(layerUpdateInfo);
+                    }
+
+                    var afterLayerFinalize = DateTime.UtcNow;
+                    LogDebug($"Layer {currentGroup.Id}: finalize and update info in {(afterLayerFinalize - afterTileBuild).TotalMilliseconds:F2} ms");
+                }
+            }
+        }
+
+        private static DotRecastNavigationMeshTile BuildTile(Point tileCoordinate, DotRecastNavigationMeshBuildSettings buildSettings, DotRecastNavigationAgentSettings agentSettings,
+            ICollection<BoundingBox> boundingBoxes, ReadOnlySpan<Vector3> inputVertices, ReadOnlySpan<int> inputIndices)
+        {
+            var tileStartTimestamp = DateTime.UtcNow;
             DotRecastNavigationMeshTile? meshTile = null;
 
             // Include bounding boxes in tile height range
@@ -396,7 +452,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                 };
 
                 var builder = new NavigationBuilder(internalBuildSettings);
-                GeneratedData generatedData = builder.BuildNavmesh(ref inputVertices, ref inputIndices);
+                GeneratedData generatedData = builder.BuildNavmesh(inputVertices, inputIndices);
 
                 if (generatedData.Success)
                 {
@@ -407,6 +463,9 @@ namespace Doprez.Stride.DotRecast.Navigation
                     };
                 }
             }
+
+            var afterTile = DateTime.UtcNow;
+            LogDebug($"Tile {tileCoordinate}: total tile build in {(afterTile - tileStartTimestamp).TotalMilliseconds:F2} ms");
 
             return meshTile;
         }
@@ -457,6 +516,21 @@ namespace Doprez.Stride.DotRecast.Navigation
             }
         }
 
+        private static bool BoundingBoxesEqual(ICollection<BoundingBox> previous, ICollection<BoundingBox> current)
+        {
+            if (previous.Count != current.Count)
+                return false;
+
+            // Both collections are expected to be small; use Contains to avoid extra allocations
+            foreach (var box in previous)
+            {
+                if (!current.Contains(box))
+                    return false;
+            }
+
+            return true;
+        }
+
         /// <summary>
         /// Marks tiles that should be built according to how much their geometry affects the navigation mesh and the bounding boxes specified for building
         /// </summary>
@@ -466,12 +540,12 @@ namespace Doprez.Stride.DotRecast.Navigation
             BoundingBox boundingBoxToCheck = inputBuilder.BoundingBox;
             NavigationMeshBuildUtils.ExtendBoundingBox(ref boundingBoxToCheck, new Vector3(agentSettings.Radius));
 
-            Logger.Info("Marking tiles for bounding box: " + boundingBoxToCheck);
+            LogDebug("Marking tiles for bounding box: " + boundingBoxToCheck);
 
             List<Point> newTileList = NavigationMeshBuildUtils.GetOverlappingTiles(buildSettings, boundingBoxToCheck);
             foreach (Point p in newTileList)
             {
-                Logger.Info("Marking tile to be rebuilt: " + p);
+                LogDebug("Marking tile to be rebuilt: " + p);
                 tilesToBuild.Add(p);
             }
         }

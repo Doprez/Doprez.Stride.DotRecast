@@ -3,7 +3,6 @@ using Stride.Core;
 using Stride.Core.Collections;
 using Stride.Core.Mathematics;
 using Stride.Engine;
-using Stride.Engine.Processors;
 using Stride.Games;
 using System.Collections.Specialized;
 
@@ -33,7 +32,6 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     private CancellationTokenSource? _buildTaskCancellationTokenSource;
 
     private SceneSystem _sceneSystem = null!;
-    private ScriptSystem _scriptSystem = null!;
     private DotRecastBoundingBoxProcessor _processor = null!;
 
     private readonly List<DotRecastBoundingBoxComponent> _boundingBoxComponents = [];
@@ -46,7 +44,6 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     protected override void OnSystemAdd()
     {
         _sceneSystem = Services.GetSafeServiceAs<SceneSystem>();
-        _scriptSystem = Services.GetSafeServiceAs<ScriptSystem>();
     }
 
     protected override void OnSystemRemove()
@@ -102,16 +99,8 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
         {
             foreach (var navMeshComponent in ComponentDatas.Values)
             {
-                if (navMeshComponent.PendingRebuild)
-                {
-                    _scriptSystem.AddTask(async () =>
-                    {
-                        await _scriptSystem.NextFrame();
-                        await Rebuild(navMeshComponent);
-                    });
-                }
-
-                navMeshComponent.PendingRebuild = false;
+                if (!navMeshComponent.PendingRebuild) continue;
+                Rebuild(navMeshComponent);
             }
         }
     }
@@ -196,7 +185,7 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
     /// <summary>
     /// Starts an asynchronous rebuild of the navigation mesh
     /// </summary>
-    public async Task Rebuild(DotRecastNavigationMeshComponent navMeshComponent)
+    public void Rebuild(DotRecastNavigationMeshComponent navMeshComponent)
     {
         if (_currentSceneInstance == null)
             return;
@@ -217,8 +206,9 @@ public class DotRecastNavigationMeshProcessor : EntityProcessor<DotRecastNavigat
             boundingBoxes.Add(new BoundingBox(translation - boundingBox.Size * scale, translation + boundingBox.Size * scale));
         }
 
-        var result = await navMeshComponent.UpdateNavMesh(boundingBoxes, _buildTaskCancellationTokenSource);
+        var result = navMeshComponent.UpdateNavMesh(boundingBoxes, _buildTaskCancellationTokenSource);
 
+        if (result?.OldNavigationMesh == result?.BuildResult?.NavigationMesh) return;
         NavigationMeshUpdated?.Invoke(this, result);
     }
 
