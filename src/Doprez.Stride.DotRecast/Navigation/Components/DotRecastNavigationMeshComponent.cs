@@ -81,11 +81,6 @@ public class DotRecastNavigationMeshComponent : EntityComponent
         }
     }
 
-    internal void MarkTilesForRebuild(ICollection<BoundingBox> boundingBoxes)
-    {
-
-    }
-
     private NavigationMeshUpdatedEventArgs? FinalizeRebuild(NavigationMeshBuildResult result)
     {
         if (result.Success)

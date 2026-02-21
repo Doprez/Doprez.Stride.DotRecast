@@ -19,7 +19,7 @@ namespace Doprez.Stride.DotRecast.Navigation
         public bool CollidersChanged = true;
 
         internal static Logger Logger = GlobalLogger.GetLogger(nameof(NavigationMeshBuilder));
-        internal static bool EnableDebugLogs { get; set; } = true;
+        internal static bool EnableDebugLogs { get; set; } = false;
 
         private static void LogDebug(string message)
         {
@@ -92,7 +92,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             ICollection<BoundingBox> boundingBoxes)
         {
             var buildStartTimestamp = DateTime.UtcNow;
-            Logger.Info("Navigation mesh build started");
+            LogDebug("Navigation mesh build started");
 
             var lastCache = _oldNavigationMesh?.Cache;
             var result = new NavigationMeshBuildResult();
@@ -114,7 +114,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             {
                 // Start from scratch if settings changed
                 _oldNavigationMesh = null;
-                Logger.Info("Build settings changed, doing a full rebuild");
+                LogDebug("Build settings changed, doing a full rebuild");
             }
 
             // Copy colliders so the collection doesn't get modified
@@ -132,7 +132,7 @@ namespace Doprez.Stride.DotRecast.Navigation
             {
                 result.Success = true;
                 result.NavigationMesh = _oldNavigationMesh;
-                Logger.Info("Navigation mesh build skipped: no changes detected");
+                LogDebug("Navigation mesh build skipped: no changes detected");
                 return result;
             }
 
@@ -206,7 +206,7 @@ namespace Doprez.Stride.DotRecast.Navigation
 
             result.Success = true;
             var afterBuild = DateTime.UtcNow;
-            Logger.Info($"Navigation mesh build completed successfully in {(afterBuild - buildStartTimestamp).TotalMilliseconds:F2} ms");
+            LogDebug($"Navigation mesh build completed successfully in {(afterBuild - buildStartTimestamp).TotalMilliseconds:F2} ms");
             return result;
         }
 
@@ -278,7 +278,7 @@ namespace Doprez.Stride.DotRecast.Navigation
                 }
             }
 
-            Logger.Info($"{_tilesToBuild.Count} tiles left to be built.");
+            LogDebug($"{_tilesToBuild.Count} tiles left to be built.");
         }
 
         internal void BuildTiles(DotRecastNavigationMeshBuildSettings buildSettings, ICollection<BoundingBox> boundingBoxes,
